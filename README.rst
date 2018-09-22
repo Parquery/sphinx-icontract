@@ -20,7 +20,7 @@ Sphinx-icontract extends Sphinx to include icontracts of classes and functions i
 
 Usage
 =====
-Sphinx-icontract is based on the :py:module:`sphinx.ext.autodoc` module. You need to specify both modules in
+Sphinx-icontract is based on the `sphinx.ext.autodoc` module. You need to specify both modules in
 ``extensions`` of your Sphinx configuration file (``conf.py``).
 
 Here is an example excerpt:
