@@ -1,0 +1,1 @@
+"""Test sphinx-icontract."""
