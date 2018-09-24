@@ -7,8 +7,9 @@
 # pylint: disable=no-member
 # pylint: disable=no-self-use
 # pylint: disable=unused-argument
-
+import pathlib
 import unittest
+from typing import List
 
 import icontract
 
@@ -71,6 +72,32 @@ class TestFormatContracts(unittest.TestCase):
                 # yapf: disable
                 ':ensures:',
                 '    * :code:`result >= x`'
+                # yapf: enable
+            ],
+            lines)
+
+    def test_slow(self):
+        # Test that the contract is retrieved based on enabled.
+        # An example taken from https://github.com/Parquery/pypackagery
+
+        assert icontract.SLOW, \
+            "Slow contracts need to be enabled by setting the environment variable ICONTRACT_SLOW."
+
+        @icontract.post(
+            lambda initial_paths, result: all(pth in result for pth in initial_paths if pth.is_file()),
+            "Initial files also in result",
+            enabled=icontract.SLOW)
+        def resolve_initial_paths(initial_paths: List[pathlib.Path]) -> List[pathlib.Path]:
+            pass
+
+        lines = sphinx_icontract._format_contracts(what='function', obj=resolve_initial_paths)
+
+        self.assertListEqual(
+            [
+                # yapf: disable
+                ':ensures:',
+                '    * :code:`all(pth in result for pth in initial_paths if pth.is_file())` '
+                '(Initial files also in result)'
                 # yapf: enable
             ],
             lines)

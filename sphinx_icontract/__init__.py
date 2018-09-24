@@ -101,6 +101,7 @@ def _format_contracts(what: str, obj: Any) -> List[str]:
     """Format the contracts as reST."""
     if what in ['function', 'method']:
         checker = icontract._find_checker(func=obj)
+
         if checker is not None:
             preconditions = getattr(checker, "__preconditions__", [])  # type: List[List[icontract._Contract]]
 
