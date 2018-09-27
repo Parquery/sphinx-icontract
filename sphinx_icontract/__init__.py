@@ -1,6 +1,6 @@
 """Add contracts to the documentation."""
 
-from typing import List, Callable, Any
+from typing import List, Callable, Any, Optional, Tuple
 
 import icontract
 import icontract.represent
@@ -32,18 +32,32 @@ def format_condition(condition: Callable[..., bool]) -> str:
     return ':code:`{}`'.format(text)
 
 
+@icontract.pre(lambda prefix: prefix is None or prefix == prefix.strip())
 @icontract.post(lambda preconditions, result: not preconditions or len(result) > 0)
-def _format_preconditions(preconditions: List[List[icontract._Contract]]) -> List[str]:
-    """Format preconditions as reST."""
+@icontract.post(lambda result: all(not '\n' in line for line in result))
+def _format_preconditions(preconditions: List[List[icontract._Contract]], prefix: Optional[str] = None) -> List[str]:
+    """
+    Format preconditions as reST.
+
+    :param preconditions: preconditions of a function
+    :param prefix: prefix of the ``:requires:`` and ``:requires else:`` directive
+    :return: list of lines
+    """
     if not preconditions:
         return []
 
     result = []  # type: List[str]
     for i, group in enumerate(preconditions):
         if i == 0:
-            result.extend([":requires:"])
+            if prefix is not None:
+                result.append(":{} requires:".format(prefix))
+            else:
+                result.append(":requires:")
         else:
-            result.extend([":requires else:"])
+            if prefix is not None:
+                result.append(":{} requires else:".format(prefix))
+            else:
+                result.append(":requires else:")
 
         for precondition in group:
             condition = precondition.condition
@@ -57,13 +71,27 @@ def _format_preconditions(preconditions: List[List[icontract._Contract]]) -> Lis
     return result
 
 
+@icontract.pre(lambda prefix: prefix is None or prefix == prefix.strip())
 @icontract.post(lambda postconditions, result: not postconditions or len(result) > 0)
-def _format_postconditions(postconditions: List[icontract._Contract]) -> List[str]:
-    """Format postconditions as reST."""
+@icontract.post(lambda result: all(not '\n' in line for line in result))
+def _format_postconditions(postconditions: List[icontract._Contract], prefix: Optional[str] = None) -> List[str]:
+    """
+    Format postconditions as reST.
+
+    :param postconditions: postconditions of a function
+    :param prefix: prefix to be prepended to ``:ensures:`` directive
+    :return: list of lines describing the postconditions
+    """
     if not postconditions:
         return []
 
-    result = [":ensures:"]  # type: List[str]
+    result = []  # type: List[str]
+
+    if prefix is not None:
+        result.append(":{} ensures:".format(prefix))
+    else:
+        result.append(":ensures:")
+
     for postcondition in postconditions:
         condition = postcondition.condition
 
@@ -78,6 +106,7 @@ def _format_postconditions(postconditions: List[icontract._Contract]) -> List[st
 
 
 @icontract.post(lambda invariants, result: not invariants or len(result) > 0)
+@icontract.post(lambda result: all(not '\n' in line for line in result))
 def _format_invariants(invariants: List[icontract._Contract]) -> List[str]:
     """Format invariants as reST."""
     if not invariants:
@@ -97,36 +126,78 @@ def _format_invariants(invariants: List[icontract._Contract]) -> List[str]:
     return result
 
 
+def _preconditions_postconditions(
+        checker: Callable) -> Tuple[List[List[icontract._Contract]], List[icontract._Contract]]:
+    """Collect the preconditions and postconditions from a contract checker of a function."""
+    preconditions = getattr(checker, "__preconditions__", [])  # type: List[List[icontract._Contract]]
+
+    assert all(isinstance(precondition_group, list) for precondition_group in preconditions)
+    assert (all(
+        isinstance(precondition, icontract._Contract) for precondition_group in preconditions
+        for precondition in precondition_group))
+
+    # Filter empty precondition groups ("require else" blocks)
+    preconditions = [group for group in preconditions if len(group) > 0]
+
+    postconditions = getattr(checker, "__postconditions__", [])  # type: List[icontract._Contract]
+
+    assert all(isinstance(postcondition, icontract._Contract) for postcondition in postconditions)
+
+    return preconditions, postconditions
+
+
+@icontract.post(lambda result: all(not '\n' in line for line in result))
+def _format_function_contracts(func: Callable, prefix: Optional[str] = None) -> List[str]:
+    """
+    Format the preconditions and postconditions of a function given its checker decorator.
+
+    :param func: function whose contracts we are describing
+    :param prefix: prefix to be prepended to the directives (such as ``:requires:``)
+    :return: list of lines
+    """
+    checker = icontract._find_checker(func=func)
+    if checker is None:
+        return []
+
+    preconditions, postconditions = _preconditions_postconditions(checker=checker)
+
+    pre_block = _format_preconditions(preconditions=preconditions, prefix=prefix)
+    post_block = _format_postconditions(postconditions=postconditions, prefix=prefix)
+
+    return pre_block + post_block
+
+
+@icontract.post(lambda result: all(not '\n' in line for line in result))
+def _format_property_contracts(prop: property) -> List[str]:
+    result = []  # type: List[str]
+    for func, prefix in zip([prop.fget, prop.fset, prop.fdel], ['get', 'set', 'del']):
+        result.extend(_format_function_contracts(func=func, prefix=prefix))
+
+    return result
+
+
 def _format_contracts(what: str, obj: Any) -> List[str]:
     """Format the contracts as reST."""
-    if what in ['function', 'method']:
-        checker = icontract._find_checker(func=obj)
+    if what in ['function', 'method', 'attribute']:
+        if what == 'attribute':
+            if not isinstance(obj, property):
+                return []
 
-        if checker is not None:
-            preconditions = getattr(checker, "__preconditions__", [])  # type: List[List[icontract._Contract]]
+            return _format_property_contracts(prop=obj)
 
-            assert all(isinstance(precondition_group, list) for precondition_group in preconditions)
-            assert (all(
-                isinstance(precondition, icontract._Contract) for precondition_group in preconditions
-                for precondition in precondition_group))
+        if what in ['function', 'method']:
+            return _format_function_contracts(func=obj)
 
-            # Filter empty precondition groups ("require else" blocks)
-            preconditions = [group for group in preconditions if len(group) > 0]
-
-            postconditions = getattr(checker, "__postconditions__", [])  # type: List[icontract._Contract]
-
-            assert all(isinstance(postcondition, icontract._Contract) for postcondition in postconditions)
-
-            pre_block = _format_preconditions(preconditions=preconditions)
-            post_block = _format_postconditions(postconditions=postconditions)
-
-            return pre_block + post_block
+        raise NotImplementedError("Unhandled what: {}".format(what))
 
     elif what == 'class':
         invariants = getattr(obj, "__invariants__", [])  # type: List[icontract._Contract]
+        assert isinstance(invariants, list)
+        assert all(isinstance(inv, icontract._Contract) for inv in invariants)
+
         return _format_invariants(invariants=invariants)
 
-    # Only functions and classes have contracts.
+    # Only properties, functions and classes have contracts.
     return []
 
 

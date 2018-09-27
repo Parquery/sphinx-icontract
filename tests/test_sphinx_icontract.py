@@ -156,6 +156,41 @@ class TestFormatContracts(unittest.TestCase):
             ],
             lines)
 
+    def test_getter(self):
+        class SomeClass:
+            @property
+            @icontract.post(lambda result: result > 0)
+            def some_property(self) -> int:
+                """Describe some property."""
+                return 1
+
+            @some_property.setter
+            @icontract.pre(lambda some_value: some_value > 0)
+            def some_property(self, some_value: int) -> None:
+                """Set some property."""
+                pass
+
+            @some_property.deleter
+            @icontract.pre(lambda self: self.name != "")
+            def some_property(self) -> None:
+                """Delete some property."""
+                pass
+
+        lines = sphinx_icontract._format_contracts(what='attribute', obj=SomeClass.some_property)
+
+        self.assertListEqual(
+            [
+                # yapf: disable
+                ':get ensures:',
+                '    * :code:`result > 0`',
+                ':set requires:',
+                '    * :code:`some_value > 0`',
+                ':del requires:',
+                '    * :code:`self.name != ""`'
+                # yapf: enable
+            ],
+            lines)
+
     def test_class_hierarchy(self):
         @icontract.inv(lambda self: self.some_getter() > 0)
         class SomeAbstract(icontract.DBC):
