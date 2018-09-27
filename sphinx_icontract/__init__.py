@@ -1,5 +1,5 @@
 """Add contracts to the documentation."""
-
+import ast
 from typing import List, Callable, Any, Optional, Tuple
 
 import icontract
@@ -21,15 +21,27 @@ __copyright__ = sphinx_icontract_meta.__copyright__
 # pylint: disable=protected-access
 
 
-def format_condition(condition: Callable[..., bool]) -> str:
+def _format_condition(condition: Callable[..., bool]) -> str:
     """Format condition as reST."""
     lambda_inspection = icontract.represent.inspect_lambda_condition(condition=condition)
 
     if lambda_inspection is None:
         return ':py:func:`{}`'.format(condition.__name__)
 
-    text = icontract.represent.condition_as_text(condition=condition, lambda_inspection=lambda_inspection)
-    return ':code:`{}`'.format(text)
+    lambda_ast_node = lambda_inspection.node
+    assert isinstance(lambda_ast_node, ast.Lambda)
+
+    body_node = lambda_ast_node.body
+
+    if isinstance(body_node, ast.BoolOp) and isinstance(body_node.op, ast.Or) and len(body_node.values) == 2 and \
+            isinstance(body_node.values[0], ast.UnaryOp) and isinstance(body_node.values[0].op, ast.Not):
+        text = ':code:`{}` ⇒ :code:`{}`'.format(
+            lambda_inspection.atok.get_text(node=body_node.values[0].operand),
+            lambda_inspection.atok.get_text(node=body_node.values[1]))
+    else:
+        text = ':code:`{}`'.format(lambda_inspection.atok.get_text(node=body_node))
+
+    return text
 
 
 @icontract.pre(lambda prefix: prefix is None or prefix == prefix.strip())
@@ -62,9 +74,9 @@ def _format_preconditions(preconditions: List[List[icontract._Contract]], prefix
         for precondition in group:
             condition = precondition.condition
             if precondition.description:
-                text = "{} ({})".format(format_condition(condition=condition), precondition.description)
+                text = "{} ({})".format(_format_condition(condition=condition), precondition.description)
             else:
-                text = format_condition(condition=condition)
+                text = _format_condition(condition=condition)
 
             result.append("    * {}".format(text))
 
@@ -96,9 +108,9 @@ def _format_postconditions(postconditions: List[icontract._Contract], prefix: Op
         condition = postcondition.condition
 
         if postcondition.description:
-            text = "{} ({})".format(format_condition(condition=condition), postcondition.description)
+            text = "{} ({})".format(_format_condition(condition=condition), postcondition.description)
         else:
-            text = format_condition(condition=condition)
+            text = _format_condition(condition=condition)
 
         result.append("    * {}".format(text))
 
@@ -117,9 +129,9 @@ def _format_invariants(invariants: List[icontract._Contract]) -> List[str]:
         condition = invariant.condition
 
         if invariant.description:
-            text = "{} ({})".format(format_condition(condition=condition), invariant.description)
+            text = "{} ({})".format(_format_condition(condition=condition), invariant.description)
         else:
-            text = format_condition(condition=condition)
+            text = _format_condition(condition=condition)
 
         result.append("    * {}".format(text))
 
