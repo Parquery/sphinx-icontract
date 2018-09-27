@@ -21,14 +21,24 @@ class TestFormatCondition(unittest.TestCase):
         def some_func() -> bool:
             return True
 
-        text = sphinx_icontract.format_condition(condition=some_func)
+        text = sphinx_icontract._format_condition(condition=some_func)
 
         self.assertEqual(':py:func:`some_func`', text)
 
     def test_lambda(self):
-        text = sphinx_icontract.format_condition(condition=lambda x: x > 0)
+        text = sphinx_icontract._format_condition(condition=lambda x: x > 0)
 
         self.assertEqual(':code:`x > 0`', text)
+
+    def test_implies(self):
+        text = sphinx_icontract._format_condition(condition=lambda x: not (x > 0) or x < 100)
+
+        self.assertEqual(':code:`x > 0` ⇒ :code:`x < 100`', text)
+
+    def test_implies_and(self):
+        text = sphinx_icontract._format_condition(condition=lambda x: not (x > 0) or (x < 100 and x % 3 == 0))
+
+        self.assertEqual(':code:`x > 0` ⇒ :code:`x < 100 and x % 3 == 0`', text)
 
 
 class TestFormatContracts(unittest.TestCase):
