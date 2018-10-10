@@ -1,3 +1,7 @@
+1.1.1
+=====
+* Updated to icontract 1.5.9
+
 1.1.0
 =====
 * Added rendering of implications (not A or B is rendered as A ⇒ B)
