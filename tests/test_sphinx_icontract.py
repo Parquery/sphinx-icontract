@@ -26,19 +26,28 @@ class TestFormatCondition(unittest.TestCase):
         self.assertEqual(':py:func:`some_func`', text)
 
     def test_lambda(self):
-        text = sphinx_icontract._format_condition(condition=lambda x: x > 0)
+        @icontract.pre(lambda x: x > 0)
+        def some_func(x: int) -> bool:
+            return True
 
-        self.assertEqual(':code:`x > 0`', text)
+        lines = sphinx_icontract._format_function_contracts(func=some_func)
+        self.assertListEqual([':requires:', '    * :code:`x > 0`'], lines)
 
     def test_implies(self):
-        text = sphinx_icontract._format_condition(condition=lambda x: not (x > 0) or x < 100)
+        @icontract.pre(lambda x: not (x > 0) or x < 100)
+        def some_func(x: int) -> bool:
+            return True
 
-        self.assertEqual(':code:`x > 0` ⇒ :code:`x < 100`', text)
+        lines = sphinx_icontract._format_function_contracts(func=some_func)
+        self.assertListEqual([':requires:', '    * :code:`x > 0` ⇒ :code:`x < 100`'], lines)
 
     def test_implies_and(self):
-        text = sphinx_icontract._format_condition(condition=lambda x: not (x > 0) or (x < 100 and x % 3 == 0))
+        @icontract.pre(lambda x: not (x > 0) or (x < 100 and x % 3 == 0))
+        def some_func(x: int) -> bool:
+            return True
 
-        self.assertEqual(':code:`x > 0` ⇒ :code:`x < 100 and x % 3 == 0`', text)
+        lines = sphinx_icontract._format_function_contracts(func=some_func)
+        self.assertListEqual([':requires:', '    * :code:`x > 0` ⇒ :code:`x < 100 and x % 3 == 0`'], lines)
 
 
 class TestFormatContracts(unittest.TestCase):
