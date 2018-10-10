@@ -3,7 +3,7 @@ import ast
 from typing import List, Callable, Any, Optional, Tuple
 
 import icontract
-import icontract.represent
+import icontract._represent
 
 import sphinx_icontract_meta
 
@@ -23,7 +23,7 @@ __copyright__ = sphinx_icontract_meta.__copyright__
 
 def _format_condition(condition: Callable[..., bool]) -> str:
     """Format condition as reST."""
-    lambda_inspection = icontract.represent.inspect_lambda_condition(condition=condition)
+    lambda_inspection = icontract._represent.inspect_lambda_condition(condition=condition)
 
     if lambda_inspection is None:
         return ':py:func:`{}`'.format(condition.__name__)
@@ -164,7 +164,7 @@ def _format_function_contracts(func: Callable, prefix: Optional[str] = None) -> 
     Format the preconditions and postconditions of a function given its checker decorator.
 
     :param func: function whose contracts we are describing
-    :param prefix: prefix to be prepended to the directives (such as ``:requires:``)
+    :param prefix: prefix to be prepended to the contract directives such as ``get`` or ``set``
     :return: list of lines
     """
     checker = icontract._find_checker(func=func)
