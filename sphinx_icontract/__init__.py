@@ -2,6 +2,7 @@
 import ast
 from typing import List, Callable, Any, Optional, Tuple
 
+import asttokens
 import icontract
 import icontract._represent
 
@@ -21,6 +22,66 @@ __copyright__ = sphinx_icontract_meta.__copyright__
 # pylint: disable=protected-access
 
 
+def _negate_compare_text(atok: asttokens.ASTTokens, node: ast.Compare) -> str:
+    """
+    Generate the text representing the negation of the comparison node.
+
+    :param atok:
+        parsing obtained with ``asttokens`` so that we can access the last tokens of a node.
+
+        The standard ``ast`` module provides only the first token of an AST node. In lack of concrete syntax tree,
+        getting text from first to last token is currently the simplest approach.
+    :param node: AST node representing the comparison in a condition
+    :return: text representation of the node's negation
+    """
+    assert len(node.ops) == 1, "A single comparison expected, but got: {}".format(len(node.ops))
+    assert len(node.comparators) == 1, "A single comparator expected, but got: {}".format(len(node.comparators))
+
+    operator = node.ops[0]
+    left = node.left
+    right = node.comparators[0]
+
+    left_text = atok.get_text(node=left)
+    right_text = atok.get_text(node=right)
+
+    text = ''
+
+    if isinstance(operator, ast.Eq):
+        text = '{} != {}'.format(left_text, right_text)
+
+    elif isinstance(operator, ast.NotEq):
+        text = '{} == {}'.format(left_text, right_text)
+
+    elif isinstance(operator, ast.Lt):
+        text = '{} >= {}'.format(left_text, right_text)
+
+    elif isinstance(operator, ast.LtE):
+        text = '{} > {}'.format(left_text, right_text)
+
+    elif isinstance(operator, ast.Gt):
+        text = '{} <= {}'.format(left_text, right_text)
+
+    elif isinstance(operator, ast.GtE):
+        text = '{} < {}'.format(left_text, right_text)
+
+    elif isinstance(operator, ast.Is):
+        text = '{} is not {}'.format(left_text, right_text)
+
+    elif isinstance(operator, ast.IsNot):
+        text = '{} is {}'.format(left_text, right_text)
+
+    elif isinstance(operator, ast.In):
+        text = '{} not in {}'.format(left_text, right_text)
+
+    elif isinstance(operator, ast.NotIn):
+        text = '{} in {}'.format(left_text, right_text)
+
+    else:
+        raise NotImplementedError("Unhandled comparison operator: {}".format(operator))
+
+    return text
+
+
 def _format_condition(condition: Callable[..., bool]) -> str:
     """Format condition as reST."""
     lambda_inspection = icontract._represent.inspect_lambda_condition(condition=condition)
@@ -33,12 +94,35 @@ def _format_condition(condition: Callable[..., bool]) -> str:
 
     body_node = lambda_ast_node.body
 
-    if isinstance(body_node, ast.BoolOp) and isinstance(body_node.op, ast.Or) and len(body_node.values) == 2 and \
-            isinstance(body_node.values[0], ast.UnaryOp) and isinstance(body_node.values[0].op, ast.Not):
+    text = None  # type: Optional[str]
+    if isinstance(body_node, ast.BoolOp) and isinstance(body_node.op, ast.Or) and len(body_node.values) == 2:
+        left, right = body_node.values
+
+        if isinstance(left, ast.UnaryOp) and isinstance(left.op, ast.Not):
+            # Handle the case: not A or B is transformed to A => B
+            text = ':code:`{}` ⇒ :code:`{}`'.format(
+                lambda_inspection.atok.get_text(node=left.operand), lambda_inspection.atok.get_text(node=right))
+
+        elif isinstance(left, (ast.UnaryOp, ast.BinOp, ast.GeneratorExp, ast.IfExp)):
+            text = ':code:`not ({})` ⇒ :code:`{}`'.format(
+                lambda_inspection.atok.get_text(node=left), lambda_inspection.atok.get_text(node=right))
+
+        elif isinstance(left, ast.Compare) and len(left.ops) == 1:
+            text = ':code:`{}` ⇒ :code:`{}`'.format(
+                _negate_compare_text(atok=lambda_inspection.atok, node=left),
+                lambda_inspection.atok.get_text(node=right))
+
+        elif isinstance(left, (ast.Call, ast.Attribute, ast.Name, ast.Subscript, ast.Index, ast.Slice, ast.ExtSlice,
+                               ast.ListComp, ast.SetComp, ast.DictComp)):
+            text = ':code:`not {}` ⇒ :code:`{}`'.format(
+                lambda_inspection.atok.get_text(node=left), lambda_inspection.atok.get_text(node=right))
+
+    elif isinstance(body_node, ast.IfExp) and isinstance(body_node.orelse, ast.NameConstant) and body_node.orelse.value:
         text = ':code:`{}` ⇒ :code:`{}`'.format(
-            lambda_inspection.atok.get_text(node=body_node.values[0].operand),
-            lambda_inspection.atok.get_text(node=body_node.values[1]))
-    else:
+            lambda_inspection.atok.get_text(node=body_node.test), lambda_inspection.atok.get_text(node=body_node.body))
+
+    if text is None:
+        # None of the previous reformatings worked, take the default approach.
         text = ':code:`{}`'.format(lambda_inspection.atok.get_text(node=body_node))
 
     return text

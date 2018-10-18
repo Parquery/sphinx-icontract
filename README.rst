@@ -35,6 +35,19 @@ Here is an example excerpt:
         'sphinx_icontract'
     ]
 
+Implications
+------------
+Sphinx-icontract tries to infer the implications from the conditions and render them as implication (``... ⇒ ...``).
+We implemented a rule-based matching that covers most of the practical use cases:
+
+* ``not A or B`` is translated to ``A ⇒ B``.
+* Expressions are negated, so ``x < y or B`` is translated to ``x >= y ⇒ B``. More general expressions are negated with
+  ``not``: from ``x.y() or B`` to ``not x.y() ⇒ B``.
+* If-Expressions are translated from ``B if A else True`` to ``A ⇒ B``.
+
+We found implications in form of if-expressions to be confusing when read in source code and encourage programmers
+to use disjunction form instead.
+
 Installation
 ============
 
