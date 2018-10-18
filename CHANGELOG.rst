@@ -1,3 +1,7 @@
+1.2.0
+=====
+* Made inferrence of implications more sophisticated
+
 1.1.1
 =====
 * Updated to icontract 1.5.9
