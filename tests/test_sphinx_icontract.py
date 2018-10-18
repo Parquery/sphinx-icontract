@@ -9,7 +9,7 @@
 # pylint: disable=unused-argument
 import pathlib
 import unittest
-from typing import List
+from typing import List, Any
 
 import icontract
 
@@ -33,7 +33,7 @@ class TestFormatCondition(unittest.TestCase):
         lines = sphinx_icontract._format_function_contracts(func=some_func)
         self.assertListEqual([':requires:', '    * :code:`x > 0`'], lines)
 
-    def test_implies(self):
+    def test_implies_with_not_or(self):
         @icontract.pre(lambda x: not (x > 0) or x < 100)
         def some_func(x: int) -> bool:
             return True
@@ -41,13 +41,106 @@ class TestFormatCondition(unittest.TestCase):
         lines = sphinx_icontract._format_function_contracts(func=some_func)
         self.assertListEqual([':requires:', '    * :code:`x > 0` ⇒ :code:`x < 100`'], lines)
 
-    def test_implies_and(self):
+    def test_implies_with_comparison_or(self):
+        @icontract.pre(lambda x: x == 0 or x % 2 == 0)
+        @icontract.pre(lambda x: x != 0 or x % 3 == 0)
+        @icontract.pre(lambda x: x < 0 or x % 4 == 0)
+        @icontract.pre(lambda x: x <= 0 or x % 5 == 0)
+        @icontract.pre(lambda x: x > 0 or x % 6 == 0)
+        @icontract.pre(lambda x: x >= 0 or x % 7 == 0)
+        @icontract.pre(lambda x: x in [1, 2] or x % 8 == 0)
+        @icontract.pre(lambda x: x not in [1, 2] or x % 9 == 0)
+        @icontract.pre(lambda x: (x + 100 < 0) or x % 10 == 0)
+        def some_func(x: int) -> bool:
+            return True
+
+        lines = sphinx_icontract._format_function_contracts(func=some_func)
+
+        # yapf: disable
+        self.assertListEqual(
+            [
+                ':requires:',
+                '    * :code:`x + 100 >= 0` ⇒ :code:`x % 10 == 0`',
+                '    * :code:`x in [1, 2]` ⇒ :code:`x % 9 == 0`',
+                '    * :code:`x not in [1, 2]` ⇒ :code:`x % 8 == 0`',
+                '    * :code:`x < 0` ⇒ :code:`x % 7 == 0`',
+                '    * :code:`x <= 0` ⇒ :code:`x % 6 == 0`',
+                '    * :code:`x > 0` ⇒ :code:`x % 5 == 0`',
+                '    * :code:`x >= 0` ⇒ :code:`x % 4 == 0`',
+                '    * :code:`x == 0` ⇒ :code:`x % 3 == 0`',
+                '    * :code:`x != 0` ⇒ :code:`x % 2 == 0`'
+            ], lines)
+
+        # yapf: enable
+
+        # Test is/is not
+        @icontract.pre(lambda x, y: x is None or y == 1)
+        @icontract.pre(lambda x, y: x is not None or y == 2)
+        def another_func(x: int, y: int) -> None:
+            return
+
+        lines = sphinx_icontract._format_function_contracts(func=another_func)
+
+        # yapf: disable
+        self.assertListEqual(
+            [
+                ':requires:',
+                '    * :code:`x is None` ⇒ :code:`y == 2`',
+                '    * :code:`x is not None` ⇒ :code:`y == 1`'
+            ], lines)
+        # yapf: enable
+
+    def test_implies_with_value_or(self):
+        @icontract.pre(lambda x, y: x or y == 1)
+        @icontract.pre(lambda x, y: x.some_attr or y == 2)
+        @icontract.pre(lambda x, y: x.some_call() or y == 3)
+        @icontract.pre(lambda x, y: x.some_call().another_attr or y == 4)
+        @icontract.pre(lambda x, y: x.some_attr.another_call() or y == 5)
+        @icontract.pre(lambda x, y: -x or y == 6)
+        @icontract.pre(lambda x, y: x + 100 or y == 7)
+        @icontract.pre(lambda x, y: (x if x > 0 else False) or y == 8)
+        def some_func(x: Any, y: int) -> None:
+            return
+
+        lines = sphinx_icontract._format_function_contracts(func=some_func)
+
+        # yapf: disable
+        self.assertListEqual(
+            [
+                ':requires:',
+                '    * :code:`not (x if x > 0 else False)` ⇒ :code:`y == 8`',
+                '    * :code:`not (x + 100)` ⇒ :code:`y == 7`',
+                '    * :code:`not (-x)` ⇒ :code:`y == 6`',
+                '    * :code:`not x.some_attr.another_call()` ⇒ :code:`y == 5`',
+                '    * :code:`not x.some_call().another_attr` ⇒ :code:`y == 4`',
+                '    * :code:`not x.some_call()` ⇒ :code:`y == 3`',
+                '    * :code:`not x.some_attr` ⇒ :code:`y == 2`',
+                '    * :code:`not x` ⇒ :code:`y == 1`'
+            ], lines)
+        # yapf: enable
+
+    def test_implies_not_or_and(self):
         @icontract.pre(lambda x: not (x > 0) or (x < 100 and x % 3 == 0))
         def some_func(x: int) -> bool:
             return True
 
         lines = sphinx_icontract._format_function_contracts(func=some_func)
         self.assertListEqual([':requires:', '    * :code:`x > 0` ⇒ :code:`x < 100 and x % 3 == 0`'], lines)
+
+    def test_implies_with_if_else_true(self):
+        @icontract.pre(lambda x, y: y == 1 if x in [1, 2] else True)
+        def some_func(x: Any, y: int) -> None:
+            return
+
+        lines = sphinx_icontract._format_function_contracts(func=some_func)
+
+        # yapf: disable
+        self.assertListEqual(
+            [
+                ':requires:',
+                '    * :code:`x in [1, 2]` ⇒ :code:`y == 1`'
+            ], lines)
+        # yapf: enable
 
 
 class TestFormatContracts(unittest.TestCase):
