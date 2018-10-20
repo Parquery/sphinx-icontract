@@ -232,6 +232,51 @@ class TestFormatContracts(unittest.TestCase):
             ],
             lines)
 
+    def test_snapshot(self):
+        # pylint: disable=unnecessary-lambda
+        @icontract.snapshot(lambda lst: lst[:])
+        @icontract.snapshot(capture=lambda lst: len(lst), name="len_lst")
+        @icontract.post(lambda OLD, lst, value: OLD.len_lst + 1 == len(lst))
+        @icontract.post(lambda OLD, lst, value: OLD.lst + [value] == lst)
+        def some_func(lst: List[int], value: int) -> None:
+            lst.append(value)
+
+        lines = sphinx_icontract._format_contracts(what='function', obj=some_func)
+        # yapf: disable
+        self.assertListEqual(
+            [
+                ':OLD:',
+                '    * :code:`.len_lst` = :code:`len(lst)`',
+                '    * :code:`.lst` = :code:`lst[:]`'
+                , ':ensures:',
+                '    * :code:`OLD.lst + [value] == lst`',
+                '    * :code:`OLD.len_lst + 1 == len(lst)`'
+            ],
+            lines)
+        # yapf: enable
+
+    def test_snapshot_with_function(self):
+        def some_capture(lst: List[int]) -> List[int]:
+            return lst[:]
+
+        @icontract.snapshot(some_capture)
+        @icontract.post(lambda OLD, lst, value: OLD.lst + [value] == lst)
+        def some_func(lst: List[int], value: int) -> None:
+            lst.append(value)
+
+        lines = sphinx_icontract._format_contracts(what='function', obj=some_func)
+        # yapf: disable
+        self.assertListEqual(
+            [
+                ':OLD:',
+                '    * :code:`.lst` = '
+                ':code:`TestFormatContracts.test_snapshot_with_function.<locals>.some_capture(lst)`',
+                ':ensures:',
+                '    * :code:`OLD.lst + [value] == lst`'
+            ],
+            lines)
+        # yapf: enable
+
     def test_pre_post_with_description(self):
         @icontract.pre(lambda x: x > 0, 'some precondition')
         @icontract.post(lambda x, result: result >= x, 'some postcondition')
@@ -268,42 +313,62 @@ class TestFormatContracts(unittest.TestCase):
             ],
             lines)
 
-    def test_getter(self):
+    def test_property(self):
         class SomeClass:
+            def __init__(self) -> None:
+                self.gets = 0
+                self.sets = 0
+                self.dels = 0
+
             @property
             @icontract.post(lambda result: result > 0)
+            @icontract.snapshot(lambda self: self.gets, name="gets")
+            @icontract.post(lambda OLD, self: OLD.gets == self.gets + 1)
             def some_property(self) -> int:
                 """Describe some property."""
+                self.gets += 1
                 return 1
 
             @some_property.setter
             @icontract.pre(lambda some_value: some_value > 0)
+            @icontract.snapshot(lambda self: self.sets, name="sets")
+            @icontract.post(lambda OLD, self: OLD.sets == self.sets + 1)
             def some_property(self, some_value: int) -> None:
                 """Set some property."""
-                pass
+                self.sets += 1
 
             @some_property.deleter
             @icontract.pre(lambda self: self.name != "")
+            @icontract.snapshot(lambda self: self.dels, name="dels")
+            @icontract.post(lambda OLD, self: OLD.dels == self.dels + 1)
             def some_property(self) -> None:
                 """Delete some property."""
-                pass
+                self.dels += 1
 
         lines = sphinx_icontract._format_contracts(what='attribute', obj=SomeClass.some_property)
-
+        # yapf: disable
         self.assertListEqual(
-            [
-                # yapf: disable
-                ':get ensures:',
-                '    * :code:`result > 0`',
-                ':set requires:',
-                '    * :code:`some_value > 0`',
-                ':del requires:',
-                '    * :code:`self.name != ""`'
-                # yapf: enable
-            ],
+            [':get OLD:',
+             '    * :code:`.gets` = :code:`self.gets`',
+             ':get ensures:',
+             '    * :code:`OLD.gets == self.gets + 1`',
+             '    * :code:`result > 0`',
+             ':set requires:',
+             '    * :code:`some_value > 0`',
+             ':set OLD:',
+             '    * :code:`.sets` = :code:`self.sets`',
+             ':set ensures:',
+             '    * :code:`OLD.sets == self.sets + 1`',
+             ':del requires:',
+             '    * :code:`self.name != ""`',
+             ':del OLD:',
+             '    * :code:`.dels` = :code:`self.dels`',
+             ':del ensures:',
+             '    * :code:`OLD.dels == self.dels + 1`'],
             lines)
+        # yapf: enable
 
-    def test_class_hierarchy(self):
+    def test_inv_pre_post_with_class_hierarchy(self):
         @icontract.inv(lambda self: self.some_getter() > 0)
         class SomeAbstract(icontract.DBC):
             """Represent some abstract class."""
@@ -362,6 +427,35 @@ class TestFormatContracts(unittest.TestCase):
                 # yapf: enable
             ],
             lines)
+
+    def test_snapshot_with_class_hierarchy(self):
+        # pylint: disable=unnecessary-lambda
+        class SomeBase(icontract.DBC):
+            @icontract.snapshot(lambda lst: lst[:])
+            @icontract.post(lambda OLD, lst, value: lst == OLD.lst + [value])
+            def some_func(self, lst: List[int], value: int) -> None:
+                lst.append(value)
+
+        class SomeClass(SomeBase):
+            @icontract.snapshot(lambda lst: len(lst), name="len_lst")
+            @icontract.post(lambda OLD, lst: len(lst) == OLD.len_lst + 1)
+            def some_func(self, lst: List[int], value: int) -> None:
+                value = value * 1000  # do something to make the toy example meaningful
+                super().some_func(lst, value)
+
+        lines = sphinx_icontract._format_contracts(what='method', obj=SomeClass.some_func)
+
+        # yapf: disable
+        self.assertListEqual(
+            [':OLD:',
+             '    * :code:`.lst` = :code:`lst[:]`',
+             '    * :code:`.len_lst` = :code:`len(lst)`',
+             ':ensures:',
+             '    * :code:`lst == OLD.lst + [value]`',
+             '    * :code:`len(lst) == OLD.len_lst + 1`'
+             ],
+            lines)
+        # yapf: enable
 
 
 if __name__ == '__main__':

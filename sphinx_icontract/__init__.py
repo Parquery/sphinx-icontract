@@ -1,6 +1,7 @@
 """Add contracts to the documentation."""
 import ast
-from typing import List, Callable, Any, Optional, Tuple
+import inspect
+from typing import List, Callable, Any, Optional
 
 import asttokens
 import icontract
@@ -167,6 +168,77 @@ def _format_preconditions(preconditions: List[List[icontract._Contract]], prefix
     return result
 
 
+def _capture_as_text(capture: Callable[..., Any]) -> str:
+    """Convert the capture function into its text representation by parsing the source code of the decorator."""
+    if not icontract._represent._is_lambda(a_function=capture):
+        signature = inspect.signature(capture)
+        param_names = list(signature.parameters.keys())
+
+        return "{}({})".format(capture.__qualname__, ", ".join(param_names))
+
+    lines, lineno = inspect.findsource(capture)
+    filename = inspect.getsourcefile(capture)
+    decorator_inspection = icontract._represent.inspect_decorator(lines=lines, lineno=lineno, filename=filename)
+
+    call_node = decorator_inspection.node
+
+    capture_node = None  # type: Optional[ast.Lambda]
+
+    if len(call_node.args) > 0:
+        assert isinstance(call_node.args[0], ast.Lambda), \
+            ("Expected the first argument to the snapshot decorator to be a condition as lambda AST node, "
+             "but got: {}").format(type(call_node.args[0]))
+
+        capture_node = call_node.args[0]
+
+    elif len(call_node.keywords) > 0:
+        for keyword in call_node.keywords:
+            if keyword.arg == "capture":
+                assert isinstance(keyword.value, ast.Lambda), \
+                    "Expected lambda node as value of the 'capture' argument to the decorator."
+
+                capture_node = keyword.value
+                break
+
+        assert capture_node is not None, "Expected to find a keyword AST node with 'capture' arg, but found none"
+    else:
+        raise AssertionError(
+            "Expected a call AST node of a snapshot decorator to have either args or keywords, but got: {}".format(
+                ast.dump(call_node)))
+
+    capture_text = decorator_inspection.atok.get_text(capture_node.body)
+
+    return capture_text
+
+
+@icontract.pre(lambda prefix: prefix is None or prefix == prefix.strip())
+@icontract.post(lambda snapshots, result: not snapshots or len(result) > 0)
+@icontract.post(lambda result: all(not '\n' in line for line in result))
+def _format_snapshots(snapshots: List[icontract._Snapshot], prefix: Optional[str] = None) -> List[str]:
+    """
+    Format snapshots as reST.
+
+    :param snapshots: snapshots defined to capture the argument values of a function before the invocation
+    :param prefix: prefix to be prepended to ``:OLD:`` directive
+    :return: list of lines describing the snapshots
+    """
+    if not snapshots:
+        return []
+
+    result = []  # type: List[str]
+
+    if prefix is not None:
+        result.append(":{} OLD:".format(prefix))
+    else:
+        result.append(":OLD:")
+
+    for snapshot in snapshots:
+        text = _capture_as_text(capture=snapshot.capture)
+        result.append("    * :code:`.{}` = :code:`{}`".format(snapshot.name, text))
+
+    return result
+
+
 @icontract.pre(lambda prefix: prefix is None or prefix == prefix.strip())
 @icontract.post(lambda postconditions, result: not postconditions or len(result) > 0)
 @icontract.post(lambda result: all(not '\n' in line for line in result))
@@ -222,9 +294,19 @@ def _format_invariants(invariants: List[icontract._Contract]) -> List[str]:
     return result
 
 
-def _preconditions_postconditions(
-        checker: Callable) -> Tuple[List[List[icontract._Contract]], List[icontract._Contract]]:
-    """Collect the preconditions and postconditions from a contract checker of a function."""
+class _PrePostSnaps:
+    """Represent preconditions, snapshots and postconditions associated with a contract checker."""
+
+    def __init__(self, preconditions: List[List[icontract._Contract]], snapshots: List[icontract._Snapshot],
+                 postconditions: List[icontract._Contract]) -> None:
+        """Initialize with the given values."""
+        self.preconditions = preconditions
+        self.snapshots = snapshots
+        self.postconditions = postconditions
+
+
+def _preconditions_snapshots_postconditions(checker: Callable) -> _PrePostSnaps:
+    """Collect the preconditions, snapshots and postconditions from a contract checker of a function."""
     preconditions = getattr(checker, "__preconditions__", [])  # type: List[List[icontract._Contract]]
 
     assert all(isinstance(precondition_group, list) for precondition_group in preconditions)
@@ -235,11 +317,14 @@ def _preconditions_postconditions(
     # Filter empty precondition groups ("require else" blocks)
     preconditions = [group for group in preconditions if len(group) > 0]
 
+    snapshots = getattr(checker, "__postcondition_snapshots__", [])  # type: List[icontract._Snapshot]
+    assert all(isinstance(snap, icontract._Snapshot) for snap in snapshots)
+
     postconditions = getattr(checker, "__postconditions__", [])  # type: List[icontract._Contract]
 
     assert all(isinstance(postcondition, icontract._Contract) for postcondition in postconditions)
 
-    return preconditions, postconditions
+    return _PrePostSnaps(preconditions=preconditions, snapshots=snapshots, postconditions=postconditions)
 
 
 @icontract.post(lambda result: all(not '\n' in line for line in result))
@@ -255,12 +340,13 @@ def _format_function_contracts(func: Callable, prefix: Optional[str] = None) -> 
     if checker is None:
         return []
 
-    preconditions, postconditions = _preconditions_postconditions(checker=checker)
+    pps = _preconditions_snapshots_postconditions(checker=checker)
 
-    pre_block = _format_preconditions(preconditions=preconditions, prefix=prefix)
-    post_block = _format_postconditions(postconditions=postconditions, prefix=prefix)
+    pre_block = _format_preconditions(preconditions=pps.preconditions, prefix=prefix)
+    old_block = _format_snapshots(snapshots=pps.snapshots, prefix=prefix)
+    post_block = _format_postconditions(postconditions=pps.postconditions, prefix=prefix)
 
-    return pre_block + post_block
+    return pre_block + old_block + post_block
 
 
 @icontract.post(lambda result: all(not '\n' in line for line in result))
