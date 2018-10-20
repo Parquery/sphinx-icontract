@@ -1,3 +1,7 @@
+1.3.0
+=====
+* Renders ``icontract.snapshot`` decorators
+
 1.2.0
 =====
 * Made inferrence of implications more sophisticated
