@@ -1,3 +1,7 @@
+1.3.1
+=====
+* Updated to icontract 1.7.1 due to tight coupling with refactored icontract internals
+
 1.3.0
 =====
 * Renders ``icontract.snapshot`` decorators
