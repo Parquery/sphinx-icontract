@@ -6,6 +6,7 @@ from typing import List, Callable, Any, Optional
 import asttokens
 import icontract
 import icontract._represent
+import icontract._checkers
 
 import sphinx_icontract_meta
 
@@ -336,7 +337,7 @@ def _format_function_contracts(func: Callable, prefix: Optional[str] = None) -> 
     :param prefix: prefix to be prepended to the contract directives such as ``get`` or ``set``
     :return: list of lines
     """
-    checker = icontract._find_checker(func=func)
+    checker = icontract._checkers.find_checker(func=func)
     if checker is None:
         return []
 
