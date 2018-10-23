@@ -48,6 +48,54 @@ We implemented a rule-based matching that covers most of the practical use cases
 We found implications in form of if-expressions to be confusing when read in source code and encourage programmers
 to use disjunction form instead.
 
+Custom Errors
+-------------
+If you specify custom errors in the contract, sphinx-icontract will try to include the error in the documentation.
+
+The error type will be inferred from the contract's ``error`` argument. If the error message is given
+as a string literal and there is no contract description, the error message will be used to describe the contract
+so that you do not have to specify the description twice (once in the description of the contract and once
+in the error message).
+
+For example:
+
+.. code-block:: python
+
+        @icontract.pre(lambda x: x > 0, error=lambda: ValueError("x positive"))
+        def some_func(x: int) -> None:
+            pass
+
+will be documented as:
+
+.. code-block:: reStructuredText
+
+    :requires:
+                            * :code:`x > 0` (x positive; raise :py:class:`ValueError`)
+
+If both the description and the error message are given, only the description will be included:
+
+.. code-block:: python
+
+        @icontract.pre(lambda x: x > 0, description="x must be positive", error=lambda: ValueError("x positive"))
+        def some_func(x: int) -> None:
+            pass
+
+will be rendered as:
+
+.. code-block:: reStructuredText
+
+    :requires:
+        * :code:`x > 0` (x must be positive; raise :py:class:`ValueError`)
+
+.. danger::
+    Be careful when you write contracts with custom errors which are included in the documentation. This might
+    lead the caller to (ab)use the contracts as a control flow mechanism.
+
+    In that case, the user will expect that the contract is *always* enabled and not only during debug or test.
+    (For example, whenever you run `python` interpreter with ``-O`` or ``-OO``, ``__debug__`` will be `False`.
+    If you passed ``__debug__`` to your contract's ``enabled`` argument, the contract will *not* be verified in
+    ``-O`` mode.)
+
 Installation
 ============
 

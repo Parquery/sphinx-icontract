@@ -1,12 +1,12 @@
 """Add contracts to the documentation."""
 import ast
 import inspect
-from typing import List, Callable, Any, Optional
+from typing import List, Callable, Any, Optional, Tuple
 
 import asttokens
 import icontract
-import icontract._represent
 import icontract._checkers
+import icontract._represent
 
 import sphinx_icontract_meta
 
@@ -84,13 +84,8 @@ def _negate_compare_text(atok: asttokens.ASTTokens, node: ast.Compare) -> str:
     return text
 
 
-def _format_condition(condition: Callable[..., bool]) -> str:
-    """Format condition as reST."""
-    lambda_inspection = icontract._represent.inspect_lambda_condition(condition=condition)
-
-    if lambda_inspection is None:
-        return ':py:func:`{}`'.format(condition.__name__)
-
+def _condition_as_text(lambda_inspection: icontract._represent.ConditionLambdaInspection) -> str:
+    """Format condition lambda function as reST."""
     lambda_ast_node = lambda_inspection.node
     assert isinstance(lambda_ast_node, ast.Lambda)
 
@@ -130,6 +125,148 @@ def _format_condition(condition: Callable[..., bool]) -> str:
     return text
 
 
+def _error_type_and_message(
+        decorator_inspection: icontract._represent.DecoratorInspection) -> Tuple[Optional[str], Optional[str]]:
+    """
+    Inspect the error argument of a contract and infer the error type and the message if the error is given as a lambda.
+
+    If the error argument is not given or if it is not given as a lambda function, return immediately.
+
+    The error message is inferred as the single string-literal argument to a single call in the lambda body.
+
+    :param decorator_inspection: inspection of a contract decorator
+    :return: error type (None if not inferrable), error message (None if not inferrable)
+    """
+    call_node = decorator_inspection.node
+
+    error_arg_node = None  # type: Optional[ast.AST]
+    for keyword in call_node.keywords:
+        if keyword.arg == 'error':
+            error_arg_node = keyword.value
+
+    if error_arg_node is None and len(call_node.args) == 6:
+        error_arg_node = call_node.args[5]
+
+    if not isinstance(error_arg_node, ast.Lambda):
+        return None, None
+
+    body_node = error_arg_node.body
+
+    # The body of the error lambda needs to be a callable, since it needs to return an instance of Exception
+    if not isinstance(body_node, ast.Call):
+        return None, None
+
+    error_type = decorator_inspection.atok.get_text(node=body_node.func)
+
+    error_message = None  # type: Optional[str]
+    if len(body_node.args) == 1 and len(body_node.keywords) == 0:
+        if isinstance(body_node.args[0], ast.Str):
+            error_message = body_node.args[0].s
+
+    elif len(body_node.args) == 0 and len(body_node.keywords) == 1:
+        if isinstance(body_node.keywords[0].value, ast.Str):
+            error_message = body_node.keywords[0].value.s
+
+    else:
+        # The error message could not be inferred.
+        pass
+
+    return error_type, error_message
+
+
+def _format_contract(contract: icontract._Contract) -> str:
+    """Format the contract as reST."""
+    # pylint: disable=too-many-branches
+    decorator_inspection = None  # type: Optional[icontract._represent.DecoratorInspection]
+
+    ##
+    # Parse condition
+    ##
+
+    if not icontract._represent._is_lambda(a_function=contract.condition):
+        condition_text = ':py:func:`{}`'.format(contract.condition.__name__)
+    else:
+        # We need to extract the source code corresponding to the decorator since inspect.getsource() is broken with
+        # lambdas.
+
+        # Find the line corresponding to the condition lambda
+        lines, condition_lineno = inspect.findsource(contract.condition)
+        filename = inspect.getsourcefile(contract.condition)
+
+        decorator_inspection = icontract._represent.inspect_decorator(
+            lines=lines, lineno=condition_lineno, filename=filename)
+
+        lambda_inspection = icontract._represent.find_lambda_condition(decorator_inspection=decorator_inspection)
+        assert lambda_inspection is not None, \
+            "Expected non-None lambda inspection with the condition: {}".format(contract.condition)
+
+        condition_text = _condition_as_text(lambda_inspection=lambda_inspection)
+
+    ##
+    # Parse error
+    ##
+
+    error_type = None  # type: Optional[str]
+
+    # Error message is set only for an error of a contract given as a lambda that takes no arguments and returns
+    # a result of a call on a string literal (*e.g.*, ``error=ValueError("some message")``.
+    error_msg = None  # type: Optional[str]
+
+    if contract.error is not None:
+        if isinstance(contract.error, type):
+            error_type = contract.error.__qualname__
+        elif inspect.isfunction(contract.error) and icontract._represent._is_lambda(a_function=contract.error):
+            if decorator_inspection is None:
+                lines, condition_lineno = inspect.findsource(contract.error)
+                filename = inspect.getsourcefile(contract.error)
+
+                decorator_inspection = icontract._represent.inspect_decorator(
+                    lines=lines, lineno=condition_lineno, filename=filename)
+
+            error_type, error_msg = _error_type_and_message(decorator_inspection=decorator_inspection)
+        else:
+            # Error type could not be inferred
+            pass
+
+    ##
+    # Format
+    ##
+
+    description = None  # type: Optional[str]
+    if contract.description:
+        description = contract.description
+    elif error_msg is not None:
+        description = error_msg
+    else:
+        # Description could not be inferred.
+        pass
+
+    doc = None  # type: Optional[str]
+    if description and error_type:
+        if description.strip()[-1] in [".", "!", "?"]:
+            doc = "{} Raise :py:class:`{}`".format(description, error_type)
+        elif description.strip()[-1] in [",", ";"]:
+            doc = "{} raise :py:class:`{}`".format(description, error_type)
+        else:
+            doc = "{}; raise :py:class:`{}`".format(description, error_type)
+
+    elif not description and error_type:
+        doc = "Raise :py:class:`{}`".format(error_type)
+
+    elif description and not error_type:
+        doc = description
+
+    else:
+        # No extra documentation can be generated since the error type could not be inferred and
+        # no contract description was given.
+        doc = None
+
+    if doc is not None:
+        return "{} ({})".format(condition_text, doc)
+
+    return condition_text
+
+
 @icontract.pre(lambda prefix: prefix is None or prefix == prefix.strip())
 @icontract.post(lambda preconditions, result: not preconditions or len(result) > 0)
 @icontract.post(lambda result: all(not '\n' in line for line in result))
@@ -158,13 +295,7 @@ def _format_preconditions(preconditions: List[List[icontract._Contract]], prefix
                 result.append(":requires else:")
 
         for precondition in group:
-            condition = precondition.condition
-            if precondition.description:
-                text = "{} ({})".format(_format_condition(condition=condition), precondition.description)
-            else:
-                text = _format_condition(condition=condition)
-
-            result.append("    * {}".format(text))
+            result.append("    * {}".format(_format_contract(contract=precondition)))
 
     return result
 
@@ -262,14 +393,7 @@ def _format_postconditions(postconditions: List[icontract._Contract], prefix: Op
         result.append(":ensures:")
 
     for postcondition in postconditions:
-        condition = postcondition.condition
-
-        if postcondition.description:
-            text = "{} ({})".format(_format_condition(condition=condition), postcondition.description)
-        else:
-            text = _format_condition(condition=condition)
-
-        result.append("    * {}".format(text))
+        result.append("    * {}".format(_format_contract(contract=postcondition)))
 
     return result
 
@@ -283,14 +407,7 @@ def _format_invariants(invariants: List[icontract._Contract]) -> List[str]:
 
     result = [":establishes:"]  # type: List[str]
     for invariant in invariants:
-        condition = invariant.condition
-
-        if invariant.description:
-            text = "{} ({})".format(_format_condition(condition=condition), invariant.description)
-        else:
-            text = _format_condition(condition=condition)
-
-        result.append("    * {}".format(text))
+        result.append("    * {}".format(_format_contract(contract=invariant)))
 
     return result
 

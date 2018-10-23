@@ -17,14 +17,6 @@ import sphinx_icontract
 
 
 class TestFormatCondition(unittest.TestCase):
-    def test_function(self):
-        def some_func() -> bool:
-            return True
-
-        text = sphinx_icontract._format_condition(condition=some_func)
-
-        self.assertEqual(':py:func:`some_func`', text)
-
     def test_lambda(self):
         @icontract.pre(lambda x: x > 0)
         def some_func(x: int) -> bool:
@@ -454,6 +446,166 @@ class TestFormatContracts(unittest.TestCase):
              '    * :code:`lst == OLD.lst + [value]`',
              '    * :code:`len(lst) == OLD.len_lst + 1`'
              ],
+            lines)
+        # yapf: enable
+
+
+class TestError(unittest.TestCase):
+    def test_condition_lambda_and_argless_error_lambda(self):
+        @icontract.pre(lambda x: x > 0, error=lambda: ValueError("x positive"))
+        def some_func(x: int) -> None:
+            pass
+
+        lines = sphinx_icontract._format_contracts(what='function', obj=some_func)
+
+        # yapf: disable
+        self.assertListEqual(
+            [
+                ':requires:',
+                '    * :code:`x > 0` (x positive; raise :py:class:`ValueError`)'
+            ],
+            lines)
+        # yapf: enable
+
+    def test_condition_lambda_and_error_lambda_with_args(self):
+        # Error message can not be inferred from the exception call since it involves more logic than a simple string
+        # literal.
+        @icontract.pre(lambda x: x > 0, error=lambda x: ValueError("x positive, but got: {}".format(x)))
+        def some_func(x: int) -> None:
+            pass
+
+        lines = sphinx_icontract._format_contracts(what='function', obj=some_func)
+
+        # yapf: disable
+        self.assertListEqual(
+            [
+                ':requires:',
+                '    * :code:`x > 0` (Raise :py:class:`ValueError`)'
+            ],
+            lines)
+        # yapf: enable
+
+    def test_condition_lambda_and_error_lambda_with_exception_keyword(self):
+        @icontract.pre(lambda x: x > 0, error=lambda: ValueError(msg="x positive"))
+        def some_func(x: int) -> None:
+            pass
+
+        lines = sphinx_icontract._format_contracts(what='function', obj=some_func)
+
+        # yapf: disable
+        self.assertListEqual(
+            [
+                ':requires:',
+                '    * :code:`x > 0` (x positive; raise :py:class:`ValueError`)'
+            ],
+            lines)
+        # yapf: enable
+
+    def test_condition_function_and_error_lambda(self):
+        def must_be_positive(x: int) -> bool:
+            return x > 0
+
+        @icontract.pre(must_be_positive, error=lambda: ValueError("x positive"))
+        def some_func(x: int) -> None:
+            pass
+
+        lines = sphinx_icontract._format_contracts(what='function', obj=some_func)
+
+        # yapf: disable
+        self.assertListEqual(
+            [
+                ':requires:',
+                '    * :py:func:`must_be_positive` (x positive; raise :py:class:`ValueError`)'
+            ],
+            lines)
+        # yapf: enable
+
+    def test_nested_error(self):
+        class SomeClass:
+            class SomeError(Exception):
+                pass
+
+        @icontract.pre(lambda x: x > 0, error=lambda: SomeClass.SomeError("x positive"))
+        def some_func(x: int) -> None:
+            pass
+
+        lines = sphinx_icontract._format_contracts(what='function', obj=some_func)
+
+        # yapf: disable
+        self.assertListEqual(
+            [
+                ':requires:',
+                '    * :code:`x > 0` (x positive; raise :py:class:`SomeClass.SomeError`)'
+            ],
+            lines)
+        # yapf: enable
+
+    def test_description_and_error_lambda(self):
+        # The description and error differ; the descripion must be selected.
+        @icontract.pre(lambda x: x > 0, description="x must be positive", error=lambda: ValueError("x positive"))
+        def some_func(x: int) -> None:
+            pass
+
+        lines = sphinx_icontract._format_contracts(what='function', obj=some_func)
+
+        # yapf: disable
+        self.assertListEqual(
+            [
+                ':requires:',
+                '    * :code:`x > 0` (x must be positive; raise :py:class:`ValueError`)'
+            ],
+            lines)
+        # yapf: enable
+
+    def test_error_as_class(self):
+        @icontract.pre(lambda x: x > 0, error=ValueError)
+        def some_func(x: int) -> None:
+            pass
+
+        lines = sphinx_icontract._format_contracts(what='function', obj=some_func)
+
+        # yapf: disable
+        self.assertListEqual(
+            [
+                ':requires:',
+                '    * :code:`x > 0` (Raise :py:class:`ValueError`)'
+            ],
+            lines)
+        # yapf: enable
+
+    def test_condition_function_and_error_as_class(self):
+        def must_be_positive(x: int) -> bool:
+            return x > 0
+
+        @icontract.pre(must_be_positive, error=ValueError)
+        def some_func(x: int) -> None:
+            pass
+
+        lines = sphinx_icontract._format_contracts(what='function', obj=some_func)
+
+        # yapf: disable
+        self.assertListEqual(
+            [
+                ':requires:',
+                '    * :py:func:`must_be_positive` (Raise :py:class:`ValueError`)'
+            ],
+            lines)
+        # yapf: enable
+
+    def test_decorator_with_no_keyword_args(self):
+        @icontract.pre(lambda x: x > 0, "x must be positive", None, icontract.aRepr, True,
+                       lambda: ValueError("x positive"))
+        def some_func(x: int) -> None:
+            pass
+
+        lines = sphinx_icontract._format_contracts(what='function', obj=some_func)
+
+        # yapf: disable
+        self.assertListEqual(
+            [
+                ':requires:',
+                '    * :code:`x > 0` (x must be positive; raise :py:class:`ValueError`)'
+            ],
             lines)
         # yapf: enable
 
