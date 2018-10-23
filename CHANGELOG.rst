@@ -1,3 +1,7 @@
+1.4.0
+=====
+* Added errors to contract rendering
+
 1.3.1
 =====
 * Updated to icontract 1.7.1 due to tight coupling with refactored icontract internals
