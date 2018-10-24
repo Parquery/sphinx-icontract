@@ -18,7 +18,7 @@ import sphinx_icontract
 
 class TestFormatCondition(unittest.TestCase):
     def test_lambda(self):
-        @icontract.pre(lambda x: x > 0)
+        @icontract.require(lambda x: x > 0)
         def some_func(x: int) -> bool:
             return True
 
@@ -26,7 +26,7 @@ class TestFormatCondition(unittest.TestCase):
         self.assertListEqual([':requires:', '    * :code:`x > 0`'], lines)
 
     def test_implies_with_not_or(self):
-        @icontract.pre(lambda x: not (x > 0) or x < 100)
+        @icontract.require(lambda x: not (x > 0) or x < 100)
         def some_func(x: int) -> bool:
             return True
 
@@ -34,15 +34,15 @@ class TestFormatCondition(unittest.TestCase):
         self.assertListEqual([':requires:', '    * :code:`x > 0` ⇒ :code:`x < 100`'], lines)
 
     def test_implies_with_comparison_or(self):
-        @icontract.pre(lambda x: x == 0 or x % 2 == 0)
-        @icontract.pre(lambda x: x != 0 or x % 3 == 0)
-        @icontract.pre(lambda x: x < 0 or x % 4 == 0)
-        @icontract.pre(lambda x: x <= 0 or x % 5 == 0)
-        @icontract.pre(lambda x: x > 0 or x % 6 == 0)
-        @icontract.pre(lambda x: x >= 0 or x % 7 == 0)
-        @icontract.pre(lambda x: x in [1, 2] or x % 8 == 0)
-        @icontract.pre(lambda x: x not in [1, 2] or x % 9 == 0)
-        @icontract.pre(lambda x: (x + 100 < 0) or x % 10 == 0)
+        @icontract.require(lambda x: x == 0 or x % 2 == 0)
+        @icontract.require(lambda x: x != 0 or x % 3 == 0)
+        @icontract.require(lambda x: x < 0 or x % 4 == 0)
+        @icontract.require(lambda x: x <= 0 or x % 5 == 0)
+        @icontract.require(lambda x: x > 0 or x % 6 == 0)
+        @icontract.require(lambda x: x >= 0 or x % 7 == 0)
+        @icontract.require(lambda x: x in [1, 2] or x % 8 == 0)
+        @icontract.require(lambda x: x not in [1, 2] or x % 9 == 0)
+        @icontract.require(lambda x: (x + 100 < 0) or x % 10 == 0)
         def some_func(x: int) -> bool:
             return True
 
@@ -66,8 +66,8 @@ class TestFormatCondition(unittest.TestCase):
         # yapf: enable
 
         # Test is/is not
-        @icontract.pre(lambda x, y: x is None or y == 1)
-        @icontract.pre(lambda x, y: x is not None or y == 2)
+        @icontract.require(lambda x, y: x is None or y == 1)
+        @icontract.require(lambda x, y: x is not None or y == 2)
         def another_func(x: int, y: int) -> None:
             return
 
@@ -83,14 +83,14 @@ class TestFormatCondition(unittest.TestCase):
         # yapf: enable
 
     def test_implies_with_value_or(self):
-        @icontract.pre(lambda x, y: x or y == 1)
-        @icontract.pre(lambda x, y: x.some_attr or y == 2)
-        @icontract.pre(lambda x, y: x.some_call() or y == 3)
-        @icontract.pre(lambda x, y: x.some_call().another_attr or y == 4)
-        @icontract.pre(lambda x, y: x.some_attr.another_call() or y == 5)
-        @icontract.pre(lambda x, y: -x or y == 6)
-        @icontract.pre(lambda x, y: x + 100 or y == 7)
-        @icontract.pre(lambda x, y: (x if x > 0 else False) or y == 8)
+        @icontract.require(lambda x, y: x or y == 1)
+        @icontract.require(lambda x, y: x.some_attr or y == 2)
+        @icontract.require(lambda x, y: x.some_call() or y == 3)
+        @icontract.require(lambda x, y: x.some_call().another_attr or y == 4)
+        @icontract.require(lambda x, y: x.some_attr.another_call() or y == 5)
+        @icontract.require(lambda x, y: -x or y == 6)
+        @icontract.require(lambda x, y: x + 100 or y == 7)
+        @icontract.require(lambda x, y: (x if x > 0 else False) or y == 8)
         def some_func(x: Any, y: int) -> None:
             return
 
@@ -112,7 +112,7 @@ class TestFormatCondition(unittest.TestCase):
         # yapf: enable
 
     def test_implies_not_or_and(self):
-        @icontract.pre(lambda x: not (x > 0) or (x < 100 and x % 3 == 0))
+        @icontract.require(lambda x: not (x > 0) or (x < 100 and x % 3 == 0))
         def some_func(x: int) -> bool:
             return True
 
@@ -120,7 +120,7 @@ class TestFormatCondition(unittest.TestCase):
         self.assertListEqual([':requires:', '    * :code:`x > 0` ⇒ :code:`x < 100 and x % 3 == 0`'], lines)
 
     def test_implies_with_if_else_true(self):
-        @icontract.pre(lambda x, y: y == 1 if x in [1, 2] else True)
+        @icontract.require(lambda x, y: y == 1 if x in [1, 2] else True)
         def some_func(x: Any, y: int) -> None:
             return
 
@@ -151,7 +151,7 @@ class TestFormatContracts(unittest.TestCase):
         self.assertListEqual([], lines)
 
     def test_pre(self):
-        @icontract.pre(lambda x: x > 0)
+        @icontract.require(lambda x: x > 0)
         def some_func(x: int) -> int:
             return x
 
@@ -166,7 +166,7 @@ class TestFormatContracts(unittest.TestCase):
             lines)
 
     def test_post(self):
-        @icontract.post(lambda x, result: result >= x)
+        @icontract.ensure(lambda x, result: result >= x)
         def some_func(x: int) -> int:
             return x
 
@@ -187,7 +187,7 @@ class TestFormatContracts(unittest.TestCase):
         assert icontract.SLOW, \
             "Slow contracts need to be enabled by setting the environment variable ICONTRACT_SLOW."
 
-        @icontract.post(
+        @icontract.ensure(
             lambda initial_paths, result: all(pth in result for pth in initial_paths if pth.is_file()),
             "Initial files also in result",
             enabled=icontract.SLOW)
@@ -207,8 +207,8 @@ class TestFormatContracts(unittest.TestCase):
             lines)
 
     def test_pre_post(self):
-        @icontract.pre(lambda x: x > 0)
-        @icontract.post(lambda x, result: result >= x)
+        @icontract.require(lambda x: x > 0)
+        @icontract.ensure(lambda x, result: result >= x)
         def some_func(x: int) -> int:
             return x
 
@@ -228,8 +228,8 @@ class TestFormatContracts(unittest.TestCase):
         # pylint: disable=unnecessary-lambda
         @icontract.snapshot(lambda lst: lst[:])
         @icontract.snapshot(capture=lambda lst: len(lst), name="len_lst")
-        @icontract.post(lambda OLD, lst, value: OLD.len_lst + 1 == len(lst))
-        @icontract.post(lambda OLD, lst, value: OLD.lst + [value] == lst)
+        @icontract.ensure(lambda OLD, lst, value: OLD.len_lst + 1 == len(lst))
+        @icontract.ensure(lambda OLD, lst, value: OLD.lst + [value] == lst)
         def some_func(lst: List[int], value: int) -> None:
             lst.append(value)
 
@@ -252,7 +252,7 @@ class TestFormatContracts(unittest.TestCase):
             return lst[:]
 
         @icontract.snapshot(some_capture)
-        @icontract.post(lambda OLD, lst, value: OLD.lst + [value] == lst)
+        @icontract.ensure(lambda OLD, lst, value: OLD.lst + [value] == lst)
         def some_func(lst: List[int], value: int) -> None:
             lst.append(value)
 
@@ -270,8 +270,8 @@ class TestFormatContracts(unittest.TestCase):
         # yapf: enable
 
     def test_pre_post_with_description(self):
-        @icontract.pre(lambda x: x > 0, 'some precondition')
-        @icontract.post(lambda x, result: result >= x, 'some postcondition')
+        @icontract.require(lambda x: x > 0, 'some precondition')
+        @icontract.ensure(lambda x, result: result >= x, 'some postcondition')
         def some_func(x: int) -> int:
             return x
 
@@ -288,7 +288,7 @@ class TestFormatContracts(unittest.TestCase):
             lines)
 
     def test_invariant_with_description(self):
-        @icontract.inv(lambda self: self.some_getter() > 0, "some invariant")
+        @icontract.invariant(lambda self: self.some_getter() > 0, "some invariant")
         class SomeClass(icontract.DBC):
             """Represent some abstract class."""
 
@@ -313,26 +313,26 @@ class TestFormatContracts(unittest.TestCase):
                 self.dels = 0
 
             @property
-            @icontract.post(lambda result: result > 0)
+            @icontract.ensure(lambda result: result > 0)
             @icontract.snapshot(lambda self: self.gets, name="gets")
-            @icontract.post(lambda OLD, self: OLD.gets == self.gets + 1)
+            @icontract.ensure(lambda OLD, self: OLD.gets == self.gets + 1)
             def some_property(self) -> int:
                 """Describe some property."""
                 self.gets += 1
                 return 1
 
             @some_property.setter
-            @icontract.pre(lambda some_value: some_value > 0)
+            @icontract.require(lambda some_value: some_value > 0)
             @icontract.snapshot(lambda self: self.sets, name="sets")
-            @icontract.post(lambda OLD, self: OLD.sets == self.sets + 1)
+            @icontract.ensure(lambda OLD, self: OLD.sets == self.sets + 1)
             def some_property(self, some_value: int) -> None:
                 """Set some property."""
                 self.sets += 1
 
             @some_property.deleter
-            @icontract.pre(lambda self: self.name != "")
+            @icontract.require(lambda self: self.name != "")
             @icontract.snapshot(lambda self: self.dels, name="dels")
-            @icontract.post(lambda OLD, self: OLD.dels == self.dels + 1)
+            @icontract.ensure(lambda OLD, self: OLD.dels == self.dels + 1)
             def some_property(self) -> None:
                 """Delete some property."""
                 self.dels += 1
@@ -361,16 +361,16 @@ class TestFormatContracts(unittest.TestCase):
         # yapf: enable
 
     def test_inv_pre_post_with_class_hierarchy(self):
-        @icontract.inv(lambda self: self.some_getter() > 0)
+        @icontract.invariant(lambda self: self.some_getter() > 0)
         class SomeAbstract(icontract.DBC):
             """Represent some abstract class."""
 
             def some_getter(self) -> int:
                 return 1
 
-            @icontract.pre(lambda x: x > 0)
-            @icontract.pre(lambda x: x % 2 == 0)
-            @icontract.post(lambda result: result > 0)
+            @icontract.require(lambda x: x > 0)
+            @icontract.require(lambda x: x % 2 == 0)
+            @icontract.ensure(lambda result: result > 0)
             def some_func(self, x: int) -> int:
                 """
                 Compute something.
@@ -380,11 +380,11 @@ class TestFormatContracts(unittest.TestCase):
                 """
                 return x
 
-        @icontract.inv(lambda self: self.some_getter() < 100)
+        @icontract.invariant(lambda self: self.some_getter() < 100)
         class SomeClass(SomeAbstract):
-            @icontract.pre(lambda x: x > -20)
-            @icontract.pre(lambda x: x % 3 == 0)
-            @icontract.post(lambda result: result > 10)
+            @icontract.require(lambda x: x > -20)
+            @icontract.require(lambda x: x % 3 == 0)
+            @icontract.ensure(lambda result: result > 10)
             def some_func(self, x: int) -> int:
                 return x
 
@@ -424,13 +424,13 @@ class TestFormatContracts(unittest.TestCase):
         # pylint: disable=unnecessary-lambda
         class SomeBase(icontract.DBC):
             @icontract.snapshot(lambda lst: lst[:])
-            @icontract.post(lambda OLD, lst, value: lst == OLD.lst + [value])
+            @icontract.ensure(lambda OLD, lst, value: lst == OLD.lst + [value])
             def some_func(self, lst: List[int], value: int) -> None:
                 lst.append(value)
 
         class SomeClass(SomeBase):
             @icontract.snapshot(lambda lst: len(lst), name="len_lst")
-            @icontract.post(lambda OLD, lst: len(lst) == OLD.len_lst + 1)
+            @icontract.ensure(lambda OLD, lst: len(lst) == OLD.len_lst + 1)
             def some_func(self, lst: List[int], value: int) -> None:
                 value = value * 1000  # do something to make the toy example meaningful
                 super().some_func(lst, value)
@@ -452,7 +452,7 @@ class TestFormatContracts(unittest.TestCase):
 
 class TestError(unittest.TestCase):
     def test_condition_lambda_and_argless_error_lambda(self):
-        @icontract.pre(lambda x: x > 0, error=lambda: ValueError("x positive"))
+        @icontract.require(lambda x: x > 0, error=lambda: ValueError("x positive"))
         def some_func(x: int) -> None:
             pass
 
@@ -470,7 +470,7 @@ class TestError(unittest.TestCase):
     def test_condition_lambda_and_error_lambda_with_args(self):
         # Error message can not be inferred from the exception call since it involves more logic than a simple string
         # literal.
-        @icontract.pre(lambda x: x > 0, error=lambda x: ValueError("x positive, but got: {}".format(x)))
+        @icontract.require(lambda x: x > 0, error=lambda x: ValueError("x positive, but got: {}".format(x)))
         def some_func(x: int) -> None:
             pass
 
@@ -486,7 +486,7 @@ class TestError(unittest.TestCase):
         # yapf: enable
 
     def test_condition_lambda_and_error_lambda_with_exception_keyword(self):
-        @icontract.pre(lambda x: x > 0, error=lambda: ValueError(msg="x positive"))
+        @icontract.require(lambda x: x > 0, error=lambda: ValueError(msg="x positive"))
         def some_func(x: int) -> None:
             pass
 
@@ -505,7 +505,7 @@ class TestError(unittest.TestCase):
         def must_be_positive(x: int) -> bool:
             return x > 0
 
-        @icontract.pre(must_be_positive, error=lambda: ValueError("x positive"))
+        @icontract.require(must_be_positive, error=lambda: ValueError("x positive"))
         def some_func(x: int) -> None:
             pass
 
@@ -525,7 +525,7 @@ class TestError(unittest.TestCase):
             class SomeError(Exception):
                 pass
 
-        @icontract.pre(lambda x: x > 0, error=lambda: SomeClass.SomeError("x positive"))
+        @icontract.require(lambda x: x > 0, error=lambda: SomeClass.SomeError("x positive"))
         def some_func(x: int) -> None:
             pass
 
@@ -542,7 +542,7 @@ class TestError(unittest.TestCase):
 
     def test_description_and_error_lambda(self):
         # The description and error differ; the descripion must be selected.
-        @icontract.pre(lambda x: x > 0, description="x must be positive", error=lambda: ValueError("x positive"))
+        @icontract.require(lambda x: x > 0, description="x must be positive", error=lambda: ValueError("x positive"))
         def some_func(x: int) -> None:
             pass
 
@@ -558,7 +558,7 @@ class TestError(unittest.TestCase):
         # yapf: enable
 
     def test_error_as_class(self):
-        @icontract.pre(lambda x: x > 0, error=ValueError)
+        @icontract.require(lambda x: x > 0, error=ValueError)
         def some_func(x: int) -> None:
             pass
 
@@ -577,7 +577,7 @@ class TestError(unittest.TestCase):
         def must_be_positive(x: int) -> bool:
             return x > 0
 
-        @icontract.pre(must_be_positive, error=ValueError)
+        @icontract.require(must_be_positive, error=ValueError)
         def some_func(x: int) -> None:
             pass
 
@@ -593,8 +593,8 @@ class TestError(unittest.TestCase):
         # yapf: enable
 
     def test_decorator_with_no_keyword_args(self):
-        @icontract.pre(lambda x: x > 0, "x must be positive", None, icontract.aRepr, True,
-                       lambda: ValueError("x positive"))
+        @icontract.require(lambda x: x > 0, "x must be positive", icontract.aRepr, True,
+                           lambda: ValueError("x positive"))
         def some_func(x: int) -> None:
             pass
 

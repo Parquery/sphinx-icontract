@@ -31,10 +31,10 @@ setup(
     license='License :: OSI Approved :: MIT License',
     keywords='contracts sphinx extension icontract design-by-contract',
     packages=find_packages(exclude=['tests']),
-    install_requires=['icontract>=1.7.2,<2', 'sphinx', 'asttokens>=1.1.11,<2'],
+    install_requires=['icontract>=2.0.0,<3', 'sphinx', 'asttokens>=1.1.11,<2'],
     extras_require={
         'dev': [
-            'mypy==0.620', 'pylint==2.1.1', 'yapf==0.20.2', 'tox>=3.0.0', 'pyicontract-lint>=1.1.1,<2',
+            'mypy==0.620', 'pylint==2.1.1', 'yapf==0.20.2', 'tox>=3.0.0', 'pyicontract-lint>=2.0.0,<3',
             'pydocstyle>=2.1.1,<3', 'coverage>=4.5.1,<5'
         ]
     },

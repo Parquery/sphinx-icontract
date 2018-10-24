@@ -144,8 +144,8 @@ def _error_type_and_message(
         if keyword.arg == 'error':
             error_arg_node = keyword.value
 
-    if error_arg_node is None and len(call_node.args) == 6:
-        error_arg_node = call_node.args[5]
+    if error_arg_node is None and len(call_node.args) == 5:
+        error_arg_node = call_node.args[4]
 
     if not isinstance(error_arg_node, ast.Lambda):
         return None, None
@@ -267,9 +267,9 @@ def _format_contract(contract: icontract._Contract) -> str:
     return condition_text
 
 
-@icontract.pre(lambda prefix: prefix is None or prefix == prefix.strip())
-@icontract.post(lambda preconditions, result: not preconditions or len(result) > 0)
-@icontract.post(lambda result: all(not '\n' in line for line in result))
+@icontract.require(lambda prefix: prefix is None or prefix == prefix.strip())
+@icontract.ensure(lambda preconditions, result: not preconditions or len(result) > 0)
+@icontract.ensure(lambda result: all(not '\n' in line for line in result))
 def _format_preconditions(preconditions: List[List[icontract._Contract]], prefix: Optional[str] = None) -> List[str]:
     """
     Format preconditions as reST.
@@ -343,9 +343,9 @@ def _capture_as_text(capture: Callable[..., Any]) -> str:
     return capture_text
 
 
-@icontract.pre(lambda prefix: prefix is None or prefix == prefix.strip())
-@icontract.post(lambda snapshots, result: not snapshots or len(result) > 0)
-@icontract.post(lambda result: all(not '\n' in line for line in result))
+@icontract.require(lambda prefix: prefix is None or prefix == prefix.strip())
+@icontract.ensure(lambda snapshots, result: not snapshots or len(result) > 0)
+@icontract.ensure(lambda result: all(not '\n' in line for line in result))
 def _format_snapshots(snapshots: List[icontract._Snapshot], prefix: Optional[str] = None) -> List[str]:
     """
     Format snapshots as reST.
@@ -371,9 +371,9 @@ def _format_snapshots(snapshots: List[icontract._Snapshot], prefix: Optional[str
     return result
 
 
-@icontract.pre(lambda prefix: prefix is None or prefix == prefix.strip())
-@icontract.post(lambda postconditions, result: not postconditions or len(result) > 0)
-@icontract.post(lambda result: all(not '\n' in line for line in result))
+@icontract.require(lambda prefix: prefix is None or prefix == prefix.strip())
+@icontract.ensure(lambda postconditions, result: not postconditions or len(result) > 0)
+@icontract.ensure(lambda result: all(not '\n' in line for line in result))
 def _format_postconditions(postconditions: List[icontract._Contract], prefix: Optional[str] = None) -> List[str]:
     """
     Format postconditions as reST.
@@ -398,8 +398,8 @@ def _format_postconditions(postconditions: List[icontract._Contract], prefix: Op
     return result
 
 
-@icontract.post(lambda invariants, result: not invariants or len(result) > 0)
-@icontract.post(lambda result: all(not '\n' in line for line in result))
+@icontract.ensure(lambda invariants, result: not invariants or len(result) > 0)
+@icontract.ensure(lambda result: all(not '\n' in line for line in result))
 def _format_invariants(invariants: List[icontract._Contract]) -> List[str]:
     """Format invariants as reST."""
     if not invariants:
@@ -445,7 +445,7 @@ def _preconditions_snapshots_postconditions(checker: Callable) -> _PrePostSnaps:
     return _PrePostSnaps(preconditions=preconditions, snapshots=snapshots, postconditions=postconditions)
 
 
-@icontract.post(lambda result: all(not '\n' in line for line in result))
+@icontract.ensure(lambda result: all(not '\n' in line for line in result))
 def _format_function_contracts(func: Callable, prefix: Optional[str] = None) -> List[str]:
     """
     Format the preconditions and postconditions of a function given its checker decorator.
@@ -467,7 +467,7 @@ def _format_function_contracts(func: Callable, prefix: Optional[str] = None) -> 
     return pre_block + old_block + post_block
 
 
-@icontract.post(lambda result: all(not '\n' in line for line in result))
+@icontract.ensure(lambda result: all(not '\n' in line for line in result))
 def _format_property_contracts(prop: property) -> List[str]:
     result = []  # type: List[str]
     for func, prefix in zip([prop.fget, prop.fset, prop.fdel], ['get', 'set', 'del']):
