@@ -1,3 +1,7 @@
+2.0.0
+=====
+* Updated to icontract 2.0.0
+
 1.4.0
 =====
 * Added errors to contract rendering
