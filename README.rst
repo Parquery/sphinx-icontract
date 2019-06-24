@@ -61,7 +61,9 @@ For example:
 
 .. code-block:: python
 
-        @icontract.pre(lambda x: x > 0, error=lambda: ValueError("x positive"))
+        @icontract.require(
+            lambda x: x > 0, 
+            error=lambda: ValueError("x positive"))
         def some_func(x: int) -> None:
             pass
 
@@ -76,7 +78,10 @@ If both the description and the error message are given, only the description wi
 
 .. code-block:: python
 
-        @icontract.pre(lambda x: x > 0, description="x must be positive", error=lambda: ValueError("x positive"))
+        @icontract.require(
+            lambda x: x > 0, 
+            description="x must be positive", 
+            error=lambda: ValueError("x positive"))
         def some_func(x: int) -> None:
             pass
 
