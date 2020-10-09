@@ -3,7 +3,7 @@
 __title__ = 'sphinx-icontract'
 __description__ = 'Extend sphinx to include icontracts.'
 __url__ = 'https://github.com/Parquery/sphinx-icontract'
-__version__ = '2.0.0'
+__version__ = '2.0.1'
 __author__ = 'Marko Ristin'
 __author_email__ = 'marko.ristin@gmail.com'
 __license__ = 'MIT'
