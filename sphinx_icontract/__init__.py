@@ -192,6 +192,8 @@ def _format_contract(contract: icontract._Contract) -> str:
         # Find the line corresponding to the condition lambda
         lines, condition_lineno = inspect.findsource(contract.condition)
         filename = inspect.getsourcefile(contract.condition)
+        if filename is None:
+            filename = "<filename unavailable>"
 
         decorator_inspection = icontract._represent.inspect_decorator(
             lines=lines, lineno=condition_lineno, filename=filename)
@@ -219,6 +221,8 @@ def _format_contract(contract: icontract._Contract) -> str:
             if decorator_inspection is None:
                 lines, condition_lineno = inspect.findsource(contract.error)
                 filename = inspect.getsourcefile(contract.error)
+                if filename is None:
+                    filename = "<filename unavailable>"
 
                 decorator_inspection = icontract._represent.inspect_decorator(
                     lines=lines, lineno=condition_lineno, filename=filename)
@@ -310,6 +314,9 @@ def _capture_as_text(capture: Callable[..., Any]) -> str:
 
     lines, lineno = inspect.findsource(capture)
     filename = inspect.getsourcefile(capture)
+    if filename is None:
+        filename = "<filename unavailable>"
+
     decorator_inspection = icontract._represent.inspect_decorator(lines=lines, lineno=lineno, filename=filename)
 
     call_node = decorator_inspection.node
@@ -471,7 +478,7 @@ def _format_function_contracts(func: Callable, prefix: Optional[str] = None) -> 
 def _format_property_contracts(prop: property) -> List[str]:
     result = []  # type: List[str]
     for func, prefix in zip([prop.fget, prop.fset, prop.fdel], ['get', 'set', 'del']):
-        result.extend(_format_function_contracts(func=func, prefix=prefix))
+        result.extend(_format_function_contracts(func=func, prefix=prefix))  # type: ignore
 
     return result
 
