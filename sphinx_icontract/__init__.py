@@ -183,7 +183,7 @@ def _format_contract(contract: icontract._Contract) -> str:
     # Parse condition
     ##
 
-    if not icontract._represent._is_lambda(a_function=contract.condition):
+    if not icontract._represent.is_lambda(a_function=contract.condition):
         condition_text = ':py:func:`{}`'.format(contract.condition.__name__)
     else:
         # We need to extract the source code corresponding to the decorator since inspect.getsource() is broken with
@@ -217,7 +217,7 @@ def _format_contract(contract: icontract._Contract) -> str:
     if contract.error is not None:
         if isinstance(contract.error, type):
             error_type = contract.error.__qualname__
-        elif inspect.isfunction(contract.error) and icontract._represent._is_lambda(a_function=contract.error):
+        elif inspect.isfunction(contract.error) and icontract._represent.is_lambda(a_function=contract.error):
             if decorator_inspection is None:
                 lines, condition_lineno = inspect.findsource(contract.error)
                 filename = inspect.getsourcefile(contract.error)
@@ -306,7 +306,7 @@ def _format_preconditions(preconditions: List[List[icontract._Contract]], prefix
 
 def _capture_as_text(capture: Callable[..., Any]) -> str:
     """Convert the capture function into its text representation by parsing the source code of the decorator."""
-    if not icontract._represent._is_lambda(a_function=capture):
+    if not icontract._represent.is_lambda(a_function=capture):
         signature = inspect.signature(capture)
         param_names = list(signature.parameters.keys())
 
