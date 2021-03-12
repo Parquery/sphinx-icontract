@@ -1,3 +1,7 @@
+2.0.2
+=====
+*  Fixed compatibility with `icontract` >=2.4.0 (#24)
+
 2.0.1
 =====
 * Updated asttokens dependency range to >=2,<3 since it conflicted with icontract>=2.3.0
