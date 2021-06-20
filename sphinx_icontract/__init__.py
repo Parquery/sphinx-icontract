@@ -217,7 +217,7 @@ def _format_contract(contract: icontract._Contract) -> str:
     if contract.error is not None:
         if isinstance(contract.error, type):
             error_type = contract.error.__qualname__
-        elif inspect.isfunction(contract.error) and icontract._represent.is_lambda(a_function=contract.error):
+        elif callable(contract.error) and icontract._represent.is_lambda(a_function=contract.error):
             if decorator_inspection is None:
                 lines, condition_lineno = inspect.findsource(contract.error)
                 filename = inspect.getsourcefile(contract.error)
