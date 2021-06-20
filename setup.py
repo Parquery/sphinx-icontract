@@ -23,9 +23,8 @@ setup(
     author_email=sphinx_icontract_meta.__author_email__,
     classifiers=[
         'Development Status :: 5 - Production/Stable', 'Intended Audience :: Developers',
-        'License :: OSI Approved :: MIT License', 'Programming Language :: Python :: 3.5',
-        'Programming Language :: Python :: 3.6', 'Programming Language :: Python :: 3.7',
-        'Programming Language :: Python :: 3.8'
+        'License :: OSI Approved :: MIT License', 'Programming Language :: Python :: 3.6',
+        'Programming Language :: Python :: 3.7', 'Programming Language :: Python :: 3.8'
     ],
     license='License :: OSI Approved :: MIT License',
     keywords='contracts sphinx extension icontract design-by-contract',
