@@ -150,7 +150,7 @@ class TestFormatContracts(unittest.TestCase):
         lines = sphinx_icontract._format_contracts(what='class', obj=SomeClass)
         self.assertListEqual([], lines)
 
-    def test_pre(self):
+    def test_pre_single_line(self):
         @icontract.require(lambda x: x > 0)
         def some_func(x: int) -> int:
             return x
@@ -165,7 +165,39 @@ class TestFormatContracts(unittest.TestCase):
             ],
             lines)
 
-    def test_post(self):
+    def test_pre_multi_line(self):
+        # yapf: disable
+        @icontract.require(
+            lambda lst:
+            all(
+                item > 0
+                for item in lst
+            )
+            and len(lst) > 0
+        )
+        # yapf: enable
+        def some_func(lst: List[int]) -> None:
+            pass
+
+        lines = sphinx_icontract._format_contracts(what='function', obj=some_func)
+
+        # yapf: disable
+        self.assertListEqual(
+            [
+                ':requires:',
+                '    * .. code-block:: python',
+                '',
+                '        all(',
+                '            item > 0',
+                '            for item in lst',
+                '        )',
+                '        and len(lst) > 0',
+                ''
+            ],
+            lines)
+        # yapf: enable
+
+    def test_post_single_line(self):
         @icontract.ensure(lambda x, result: result >= x)
         def some_func(x: int) -> int:
             return x
@@ -179,6 +211,36 @@ class TestFormatContracts(unittest.TestCase):
                 # yapf: enable
             ],
             lines)
+
+    def test_post_multi_line(self):
+        # yapf: disable
+        @icontract.ensure(
+            lambda result:
+            all(
+                item > 0
+                for item in result
+            )
+        )
+        # yapf: enable
+        def some_func() -> List[int]:
+            return [1, 2, 3]
+
+        lines = sphinx_icontract._format_contracts(what='function', obj=some_func)
+
+        # yapf: disable
+        self.assertListEqual(
+            [
+                ':ensures:',
+                '    * .. code-block:: python',
+                '',
+                '        all(',
+                '            item > 0',
+                '            for item in result',
+                '        )',
+                ''
+            ],
+            lines)
+        # yapf: enable
 
     def test_slow(self):
         # Test that the contract is retrieved based on enabled.
@@ -200,8 +262,8 @@ class TestFormatContracts(unittest.TestCase):
             [
                 # yapf: disable
                 ':ensures:',
-                '    * :code:`all(pth in result for pth in initial_paths if pth.is_file())` '
-                '(Initial files also in result)'
+                '    * :code:`all(pth in result for pth in initial_paths if pth.is_file())`',
+                '      (Initial files also in result)'
                 # yapf: enable
             ],
             lines)
@@ -224,7 +286,7 @@ class TestFormatContracts(unittest.TestCase):
             ],
             lines)
 
-    def test_snapshot(self):
+    def test_snapshot_single_line(self):
         # pylint: disable=unnecessary-lambda
         @icontract.snapshot(lambda lst: lst[:])
         @icontract.snapshot(capture=lambda lst: len(lst), name="len_lst")
@@ -247,6 +309,57 @@ class TestFormatContracts(unittest.TestCase):
             lines)
         # yapf: enable
 
+    def test_snapshot_multi_line(self):
+        # pylint: disable=unnecessary-lambda
+        # yapf: disable
+        @icontract.snapshot(
+            lambda lst:
+            all(
+                item > 0
+                for item in lst
+            ),
+            name="lst_all_positive"
+        )
+        @icontract.ensure(
+            lambda OLD, lst:
+            OLD.lst_all_positive
+            and all(
+                item > 0
+                for item in lst
+            )
+        )
+        # yapf: enable
+        def some_func(lst: List[int]) -> None:
+            pass
+
+        lines = sphinx_icontract._format_contracts(what='function', obj=some_func)
+
+        # yapf: disable
+        self.assertListEqual(
+            [
+                ':OLD:',
+                '    * :code:`.lst_all_positive` =',
+                '',
+                '      .. code-block: python',
+                '',
+                '      all(',
+                '          item > 0',
+                '          for item in lst',
+                '      )',
+                '',
+                ':ensures:',
+                '    * .. code-block:: python',
+                '',
+                '        OLD.lst_all_positive',
+                '        and all(',
+                '            item > 0',
+                '            for item in lst',
+                '        )',
+                ''
+            ],
+            lines)
+        # yapf: enable
+
     def test_snapshot_with_function(self):
         def some_capture(lst: List[int]) -> List[int]:
             return lst[:]
@@ -257,6 +370,7 @@ class TestFormatContracts(unittest.TestCase):
             lst.append(value)
 
         lines = sphinx_icontract._format_contracts(what='function', obj=some_func)
+
         # yapf: disable
         self.assertListEqual(
             [
@@ -280,14 +394,73 @@ class TestFormatContracts(unittest.TestCase):
             [
                 # yapf: disable
                 ':requires:',
-                '    * :code:`x > 0` (some precondition)',
+                '    * :code:`x > 0`',
+                '      (some precondition)',
                 ':ensures:',
-                '    * :code:`result >= x` (some postcondition)'
+                '    * :code:`result >= x`',
+                '      (some postcondition)'
                 # yapf: enable
             ],
             lines)
 
-    def test_invariant_with_description(self):
+    def test_invariant_single_line(self) -> None:
+        @icontract.invariant(lambda self: self.some_getter() > 0)
+        class SomeClass(icontract.DBC):
+            """Represent some abstract class."""
+
+            def some_getter(self) -> int:
+                return 1
+
+        lines = sphinx_icontract._format_contracts(what='class', obj=SomeClass)
+        # yapf: disable
+        self.assertListEqual(
+            [
+
+                ':establishes:',
+                '    * :code:`self.some_getter() > 0`'
+            ],
+            lines)  # type: ignore
+        # yapf: enable
+
+    def test_invariant_multi_line(self) -> None:
+        # yapf: disable
+        @icontract.invariant(
+            lambda self:
+            all(
+                item > 0
+                for item in self.lst
+            )
+            and len(self.lst) > 0
+        )
+        # yapf: enable
+        class SomeClass(icontract.DBC):
+            """Represent some abstract class."""
+
+            def __init__(self) -> None:
+                self.lst = [1]  # type: List[int]
+
+            def do_something(self) -> None:
+                ...
+
+        lines = sphinx_icontract._format_contracts(what='class', obj=SomeClass)
+
+        # yapf: disable
+        self.assertListEqual(
+            [
+                ':establishes:',
+                '    * .. code-block:: python',
+                '',
+                '        all(',
+                '            item > 0',
+                '            for item in self.lst',
+                '        )',
+                '        and len(self.lst) > 0',
+                ''
+            ],
+            lines)  # type: ignore
+        # yapf: enable
+
+    def test_invariant_with_description(self) -> None:
         @icontract.invariant(lambda self: self.some_getter() > 0, "some invariant")
         class SomeClass(icontract.DBC):
             """Represent some abstract class."""
@@ -300,10 +473,11 @@ class TestFormatContracts(unittest.TestCase):
             [
                 # yapf: disable
                 ':establishes:',
-                '    * :code:`self.some_getter() > 0` (some invariant)'
+                '    * :code:`self.some_getter() > 0`',
+                '      (some invariant)'
                 # yapf: enable
             ],
-            lines)
+            lines)  # type: ignore
 
     def test_property(self):
         class SomeClass:
@@ -462,7 +636,8 @@ class TestError(unittest.TestCase):
         self.assertListEqual(
             [
                 ':requires:',
-                '    * :code:`x > 0` (x positive; raise :py:class:`ValueError`)'
+                '    * :code:`x > 0`',
+                '      (x positive; raise :py:class:`ValueError`)'
             ],
             lines)
         # yapf: enable
@@ -480,7 +655,8 @@ class TestError(unittest.TestCase):
         self.assertListEqual(
             [
                 ':requires:',
-                '    * :code:`x > 0` (Raise :py:class:`ValueError`)'
+                '    * :code:`x > 0`',
+                '      (Raise :py:class:`ValueError`)'
             ],
             lines)
         # yapf: enable
@@ -496,7 +672,8 @@ class TestError(unittest.TestCase):
         self.assertListEqual(
             [
                 ':requires:',
-                '    * :code:`x > 0` (x positive; raise :py:class:`ValueError`)'
+                '    * :code:`x > 0`',
+                '      (x positive; raise :py:class:`ValueError`)'
             ],
             lines)
         # yapf: enable
@@ -515,7 +692,8 @@ class TestError(unittest.TestCase):
         self.assertListEqual(
             [
                 ':requires:',
-                '    * :py:func:`must_be_positive` (x positive; raise :py:class:`ValueError`)'
+                '    * :py:func:`must_be_positive`',
+                '      (x positive; raise :py:class:`ValueError`)'
             ],
             lines)
         # yapf: enable
@@ -535,7 +713,8 @@ class TestError(unittest.TestCase):
         self.assertListEqual(
             [
                 ':requires:',
-                '    * :code:`x > 0` (x positive; raise :py:class:`SomeClass.SomeError`)'
+                '    * :code:`x > 0`',
+                '      (x positive; raise :py:class:`SomeClass.SomeError`)'
             ],
             lines)
         # yapf: enable
@@ -552,7 +731,8 @@ class TestError(unittest.TestCase):
         self.assertListEqual(
             [
                 ':requires:',
-                '    * :code:`x > 0` (x must be positive; raise :py:class:`ValueError`)'
+                '    * :code:`x > 0`',
+                '      (x must be positive; raise :py:class:`ValueError`)'
             ],
             lines)
         # yapf: enable
@@ -568,7 +748,8 @@ class TestError(unittest.TestCase):
         self.assertListEqual(
             [
                 ':requires:',
-                '    * :code:`x > 0` (Raise :py:class:`ValueError`)'
+                '    * :code:`x > 0`',
+                '      (Raise :py:class:`ValueError`)'
             ],
             lines)
         # yapf: enable
@@ -587,7 +768,8 @@ class TestError(unittest.TestCase):
         self.assertListEqual(
             [
                 ':requires:',
-                '    * :py:func:`must_be_positive` (Raise :py:class:`ValueError`)'
+                '    * :py:func:`must_be_positive`',
+                '      (Raise :py:class:`ValueError`)'
             ],
             lines)
         # yapf: enable
@@ -604,7 +786,8 @@ class TestError(unittest.TestCase):
         self.assertListEqual(
             [
                 ':requires:',
-                '    * :code:`x > 0` (x must be positive; raise :py:class:`ValueError`)'
+                '    * :code:`x > 0`',
+                '      (x must be positive; raise :py:class:`ValueError`)'
             ],
             lines)
         # yapf: enable

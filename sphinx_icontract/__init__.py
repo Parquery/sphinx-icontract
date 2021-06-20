@@ -1,7 +1,9 @@
 """Add contracts to the documentation."""
 import ast
 import inspect
-from typing import List, Callable, Any, Optional, Tuple
+import re
+import textwrap
+from typing import List, Callable, Any, Optional, Tuple, Sequence, cast, overload, Union, Iterator
 
 import asttokens
 import icontract
@@ -22,6 +24,76 @@ __copyright__ = sphinx_icontract_meta.__copyright__
 # Use protected methods from icontract and tightly couple with it. Making these specific methods "public" would
 # rather add noise to the most clients of icontract library.
 # pylint: disable=protected-access
+
+
+class Lines(icontract.DBC):
+    """Represent a sequence of text lines."""
+
+    # yapf: disable
+    @icontract.require(
+        lambda lines:
+        all(
+            '\n' not in line and '\r' not in line
+            for line in lines
+        )
+    )
+    # yapf: enable
+    def __new__(cls, lines: Sequence[str]) -> "Lines":
+        r"""
+        Ensure the properties on the ``lines``.
+
+        Please make sure that you transfer the "ownership" immediately to Lines
+        and don't modify the original list of strings any more:
+
+        .. code-block: python
+
+            ##
+            # OK
+            ##
+
+            lines = Lines(some_text.splitlines())
+
+            ##
+            # Not OK
+            ##
+
+            some_lines = some_text.splitlines()
+            lines = Lines(some_lines)
+            # ... do something assuming ``lines`` is immutable ...
+
+            some_lines[0] = "This will break \n your logic"
+            # ERROR! lines[0] now contains a new-line which is unexpected!
+
+        """
+        return cast(Lines, lines)
+
+    def __add__(self, other: "Lines") -> "Lines":
+        """Concatenate two list of lines."""
+        raise NotImplementedError("Only for type annotations")
+
+    # pylint: disable=function-redefined
+
+    @overload
+    def __getitem__(self, index: int) -> str:
+        """Get the item at the given integer index."""
+        pass
+
+    @overload
+    def __getitem__(self, index: slice) -> "Lines":
+        """Get the slice of the lines."""
+        pass
+
+    def __getitem__(self, index: Union[int, slice]) -> Union[str, "Lines"]:
+        """Get the line(s) at the given index."""
+        raise NotImplementedError("Only for type annotations")
+
+    def __len__(self) -> int:
+        """Return the number of the lines."""
+        raise NotImplementedError("Only for type annotations")
+
+    def __iter__(self) -> Iterator[str]:
+        """Iterate over the lines."""
+        raise NotImplementedError("Only for type annotations")
 
 
 def _negate_compare_text(atok: asttokens.ASTTokens, node: ast.Compare) -> str:
@@ -84,45 +156,68 @@ def _negate_compare_text(atok: asttokens.ASTTokens, node: ast.Compare) -> str:
     return text
 
 
-def _condition_as_text(lambda_inspection: icontract._represent.ConditionLambdaInspection) -> str:
-    """Format condition lambda function as reST."""
+def _condition_as_text(lambda_inspection: icontract._represent.ConditionLambdaInspection) -> Lines:
+    """Format condition lambda function as reST lines."""
     lambda_ast_node = lambda_inspection.node
     assert isinstance(lambda_ast_node, ast.Lambda)
 
     body_node = lambda_ast_node.body
 
-    text = None  # type: Optional[str]
-    if isinstance(body_node, ast.BoolOp) and isinstance(body_node.op, ast.Or) and len(body_node.values) == 2:
-        left, right = body_node.values
+    is_multiline_condition = '\n' in lambda_inspection.text
 
-        if isinstance(left, ast.UnaryOp) and isinstance(left.op, ast.Not):
-            # Handle the case: not A or B is transformed to A => B
+    if not is_multiline_condition:
+        # Pretty-print single-line implications
+        text = None  # type: Optional[str]
+
+        if isinstance(body_node, ast.BoolOp) and isinstance(body_node.op, ast.Or) and len(body_node.values) == 2:
+            left, right = body_node.values
+
+            if isinstance(left, ast.UnaryOp) and isinstance(left.op, ast.Not):
+                # Handle the case: not A or B is transformed to A => B
+                text = ':code:`{}` ⇒ :code:`{}`'.format(
+                    lambda_inspection.atok.get_text(node=left.operand), lambda_inspection.atok.get_text(node=right))
+
+            elif isinstance(left, (ast.UnaryOp, ast.BinOp, ast.GeneratorExp, ast.IfExp)):
+                text = ':code:`not ({})` ⇒ :code:`{}`'.format(
+                    lambda_inspection.atok.get_text(node=left), lambda_inspection.atok.get_text(node=right))
+
+            elif isinstance(left, ast.Compare) and len(left.ops) == 1:
+                text = ':code:`{}` ⇒ :code:`{}`'.format(
+                    _negate_compare_text(atok=lambda_inspection.atok, node=left),
+                    lambda_inspection.atok.get_text(node=right))
+
+            elif isinstance(left, (ast.Call, ast.Attribute, ast.Name, ast.Subscript, ast.Index, ast.Slice, ast.ExtSlice,
+                                   ast.ListComp, ast.SetComp, ast.DictComp)):
+                text = ':code:`not {}` ⇒ :code:`{}`'.format(
+                    lambda_inspection.atok.get_text(node=left), lambda_inspection.atok.get_text(node=right))
+
+        elif (isinstance(body_node, ast.IfExp) and isinstance(body_node.orelse, ast.NameConstant)
+              and body_node.orelse.value):
             text = ':code:`{}` ⇒ :code:`{}`'.format(
-                lambda_inspection.atok.get_text(node=left.operand), lambda_inspection.atok.get_text(node=right))
+                lambda_inspection.atok.get_text(node=body_node.test),
+                lambda_inspection.atok.get_text(node=body_node.body))
+        else:
+            # None of the patterns matched.
+            assert text is None
+            pass
 
-        elif isinstance(left, (ast.UnaryOp, ast.BinOp, ast.GeneratorExp, ast.IfExp)):
-            text = ':code:`not ({})` ⇒ :code:`{}`'.format(
-                lambda_inspection.atok.get_text(node=left), lambda_inspection.atok.get_text(node=right))
+        if text is not None:
+            return Lines([text])
 
-        elif isinstance(left, ast.Compare) and len(left.ops) == 1:
-            text = ':code:`{}` ⇒ :code:`{}`'.format(
-                _negate_compare_text(atok=lambda_inspection.atok, node=left),
-                lambda_inspection.atok.get_text(node=right))
+    # None of the previous re-formats worked, take the default approach.
+    if not is_multiline_condition:
+        result = [':code:`{}`'.format(lambda_inspection.atok.get_text(node=body_node))]
+    else:
+        result = ['.. code-block:: python', '']
 
-        elif isinstance(left, (ast.Call, ast.Attribute, ast.Name, ast.Subscript, ast.Index, ast.Slice, ast.ExtSlice,
-                               ast.ListComp, ast.SetComp, ast.DictComp)):
-            text = ':code:`not {}` ⇒ :code:`{}`'.format(
-                lambda_inspection.atok.get_text(node=left), lambda_inspection.atok.get_text(node=right))
+        dedented_body_lines = _smart_dedent_multi_line_lambda_condition(Lines(lambda_inspection.text.splitlines()))
 
-    elif isinstance(body_node, ast.IfExp) and isinstance(body_node.orelse, ast.NameConstant) and body_node.orelse.value:
-        text = ':code:`{}` ⇒ :code:`{}`'.format(
-            lambda_inspection.atok.get_text(node=body_node.test), lambda_inspection.atok.get_text(node=body_node.body))
+        for line in dedented_body_lines:
+            result.append('  {}'.format(line))
 
-    if text is None:
-        # None of the previous reformatings worked, take the default approach.
-        text = ':code:`{}`'.format(lambda_inspection.atok.get_text(node=body_node))
+        result.append('')
 
-    return text
+    return Lines(result)
 
 
 def _error_type_and_message(
@@ -174,7 +269,7 @@ def _error_type_and_message(
     return error_type, error_message
 
 
-def _format_contract(contract: icontract._Contract) -> str:
+def _format_contract(contract: icontract._Contract) -> Lines:
     """Format the contract as reST."""
     # pylint: disable=too-many-branches
     decorator_inspection = None  # type: Optional[icontract._represent.DecoratorInspection]
@@ -184,7 +279,7 @@ def _format_contract(contract: icontract._Contract) -> str:
     ##
 
     if not icontract._represent.is_lambda(a_function=contract.condition):
-        condition_text = ':py:func:`{}`'.format(contract.condition.__name__)
+        condition_lines = Lines([':py:func:`{}`'.format(contract.condition.__name__)])
     else:
         # We need to extract the source code corresponding to the decorator since inspect.getsource() is broken with
         # lambdas.
@@ -202,7 +297,7 @@ def _format_contract(contract: icontract._Contract) -> str:
         assert lambda_inspection is not None, \
             "Expected non-None lambda inspection with the condition: {}".format(contract.condition)
 
-        condition_text = _condition_as_text(lambda_inspection=lambda_inspection)
+        condition_lines = _condition_as_text(lambda_inspection=lambda_inspection)
 
     ##
     # Parse error
@@ -266,15 +361,59 @@ def _format_contract(contract: icontract._Contract) -> str:
         doc = None
 
     if doc is not None:
-        return "{} ({})".format(condition_text, doc)
+        result = condition_lines + Lines(["({})".format(doc)])
+    else:
+        result = condition_lines
 
-    return condition_text
+    return result
+
+
+def _make_bullet(lines: Lines) -> Lines:
+    """
+    Indent the lines and put the bullet point in front.
+
+    >>> _make_bullet(Lines(['x', '', '  y']))
+    ['    * x', '', '        y']
+    """
+    result = []  # type: List[str]
+    for i, line in enumerate(lines):
+        if i == 0:
+            result.append('    * {}'.format(line))
+        else:
+            if len(line.strip()) > 0:
+                result.append('      {}'.format(line))
+            else:
+                result.append('')
+
+    return Lines(result)
+
+
+_WHITESPACE_PREFIX_RE = re.compile(r'^\s+')
+
+
+def _smart_dedent_multi_line_lambda_condition(lines: Lines) -> Lines:
+    """
+    Try to dedent multi-line lambda condition for better aesthetics.
+
+    The first line is usually not indented, while the following lines are
+    (since we inspect the source code).
+    """
+    if len(lines) == 0:
+        return lines
+
+    # If the first line is already indented, try to dedent it as a block
+    if _WHITESPACE_PREFIX_RE.match(lines[0]):
+        return Lines(textwrap.dedent('\n'.join(lines)).splitlines())
+
+    dedented = textwrap.dedent('\n'.join(lines[1:]))
+    dedented_lines = dedented.splitlines()
+
+    return Lines([lines[0]] + dedented_lines)
 
 
 @icontract.require(lambda prefix: prefix is None or prefix == prefix.strip())
 @icontract.ensure(lambda preconditions, result: not preconditions or len(result) > 0)
-@icontract.ensure(lambda result: all(not '\n' in line for line in result))
-def _format_preconditions(preconditions: List[List[icontract._Contract]], prefix: Optional[str] = None) -> List[str]:
+def _format_preconditions(preconditions: List[List[icontract._Contract]], prefix: Optional[str] = None) -> Lines:
     """
     Format preconditions as reST.
 
@@ -283,7 +422,7 @@ def _format_preconditions(preconditions: List[List[icontract._Contract]], prefix
     :return: list of lines
     """
     if not preconditions:
-        return []
+        return Lines([])
 
     result = []  # type: List[str]
     for i, group in enumerate(preconditions):
@@ -299,18 +438,19 @@ def _format_preconditions(preconditions: List[List[icontract._Contract]], prefix
                 result.append(":requires else:")
 
         for precondition in group:
-            result.append("    * {}".format(_format_contract(contract=precondition)))
+            contract_bullet_point = _make_bullet(_format_contract(contract=precondition))
+            result.extend(contract_bullet_point)
 
-    return result
+    return Lines(result)
 
 
-def _capture_as_text(capture: Callable[..., Any]) -> str:
+def _capture_as_text(capture: Callable[..., Any]) -> Lines:
     """Convert the capture function into its text representation by parsing the source code of the decorator."""
     if not icontract._represent.is_lambda(a_function=capture):
         signature = inspect.signature(capture)
         param_names = list(signature.parameters.keys())
 
-        return "{}({})".format(capture.__qualname__, ", ".join(param_names))
+        return Lines(["{}({})".format(capture.__qualname__, ", ".join(param_names))])
 
     lines, lineno = inspect.findsource(capture)
     filename = inspect.getsourcefile(capture)
@@ -347,13 +487,14 @@ def _capture_as_text(capture: Callable[..., Any]) -> str:
 
     capture_text = decorator_inspection.atok.get_text(capture_node.body)
 
-    return capture_text
+    dedented_capture = _smart_dedent_multi_line_lambda_condition(capture_text.splitlines())
+
+    return dedented_capture
 
 
 @icontract.require(lambda prefix: prefix is None or prefix == prefix.strip())
 @icontract.ensure(lambda snapshots, result: not snapshots or len(result) > 0)
-@icontract.ensure(lambda result: all(not '\n' in line for line in result))
-def _format_snapshots(snapshots: List[icontract._Snapshot], prefix: Optional[str] = None) -> List[str]:
+def _format_snapshots(snapshots: List[icontract._Snapshot], prefix: Optional[str] = None) -> Lines:
     """
     Format snapshots as reST.
 
@@ -362,7 +503,7 @@ def _format_snapshots(snapshots: List[icontract._Snapshot], prefix: Optional[str
     :return: list of lines describing the snapshots
     """
     if not snapshots:
-        return []
+        return Lines([])
 
     result = []  # type: List[str]
 
@@ -372,16 +513,23 @@ def _format_snapshots(snapshots: List[icontract._Snapshot], prefix: Optional[str
         result.append(":OLD:")
 
     for snapshot in snapshots:
-        text = _capture_as_text(capture=snapshot.capture)
-        result.append("    * :code:`.{}` = :code:`{}`".format(snapshot.name, text))
+        capture_lines = _capture_as_text(capture=snapshot.capture)
 
-    return result
+        if len(capture_lines) == 1:
+            result.append("    * :code:`.{}` = :code:`{}`".format(snapshot.name, capture_lines[0]))
+        else:
+            capture_point = [':code:`.{}` ='.format(snapshot.name), '', '.. code-block: python', '']  # type: List[str]
+            capture_point.extend(capture_lines)
+            capture_point.append('')
+
+            result.extend(_make_bullet(Lines(capture_point)))
+
+    return Lines(result)
 
 
 @icontract.require(lambda prefix: prefix is None or prefix == prefix.strip())
 @icontract.ensure(lambda postconditions, result: not postconditions or len(result) > 0)
-@icontract.ensure(lambda result: all(not '\n' in line for line in result))
-def _format_postconditions(postconditions: List[icontract._Contract], prefix: Optional[str] = None) -> List[str]:
+def _format_postconditions(postconditions: List[icontract._Contract], prefix: Optional[str] = None) -> Lines:
     """
     Format postconditions as reST.
 
@@ -390,7 +538,7 @@ def _format_postconditions(postconditions: List[icontract._Contract], prefix: Op
     :return: list of lines describing the postconditions
     """
     if not postconditions:
-        return []
+        return Lines([])
 
     result = []  # type: List[str]
 
@@ -400,23 +548,24 @@ def _format_postconditions(postconditions: List[icontract._Contract], prefix: Op
         result.append(":ensures:")
 
     for postcondition in postconditions:
-        result.append("    * {}".format(_format_contract(contract=postcondition)))
+        contract_bullet_point = _make_bullet(_format_contract(contract=postcondition))
+        result.extend(contract_bullet_point)
 
-    return result
+    return Lines(result)
 
 
 @icontract.ensure(lambda invariants, result: not invariants or len(result) > 0)
-@icontract.ensure(lambda result: all(not '\n' in line for line in result))
-def _format_invariants(invariants: List[icontract._Contract]) -> List[str]:
+def _format_invariants(invariants: List[icontract._Contract]) -> Lines:
     """Format invariants as reST."""
     if not invariants:
-        return []
+        return Lines([])
 
     result = [":establishes:"]  # type: List[str]
     for invariant in invariants:
-        result.append("    * {}".format(_format_contract(contract=invariant)))
+        contract_bullet_point = _make_bullet(_format_contract(contract=invariant))
+        result.extend(contract_bullet_point)
 
-    return result
+    return Lines(result)
 
 
 class _PrePostSnaps:
@@ -452,8 +601,7 @@ def _preconditions_snapshots_postconditions(checker: Callable) -> _PrePostSnaps:
     return _PrePostSnaps(preconditions=preconditions, snapshots=snapshots, postconditions=postconditions)
 
 
-@icontract.ensure(lambda result: all(not '\n' in line for line in result))
-def _format_function_contracts(func: Callable, prefix: Optional[str] = None) -> List[str]:
+def _format_function_contracts(func: Callable, prefix: Optional[str] = None) -> Lines:
     """
     Format the preconditions and postconditions of a function given its checker decorator.
 
@@ -463,7 +611,7 @@ def _format_function_contracts(func: Callable, prefix: Optional[str] = None) -> 
     """
     checker = icontract._checkers.find_checker(func=func)
     if checker is None:
-        return []
+        return Lines([])
 
     pps = _preconditions_snapshots_postconditions(checker=checker)
 
@@ -474,21 +622,20 @@ def _format_function_contracts(func: Callable, prefix: Optional[str] = None) -> 
     return pre_block + old_block + post_block
 
 
-@icontract.ensure(lambda result: all(not '\n' in line for line in result))
-def _format_property_contracts(prop: property) -> List[str]:
+def _format_property_contracts(prop: property) -> Lines:
     result = []  # type: List[str]
     for func, prefix in zip([prop.fget, prop.fset, prop.fdel], ['get', 'set', 'del']):
         result.extend(_format_function_contracts(func=func, prefix=prefix))  # type: ignore
 
-    return result
+    return Lines(result)
 
 
-def _format_contracts(what: str, obj: Any) -> List[str]:
+def _format_contracts(what: str, obj: Any) -> Lines:
     """Format the contracts as reST."""
     if what in ['function', 'method', 'attribute']:
         if what == 'attribute':
             if not isinstance(obj, property):
-                return []
+                return Lines([])
 
             return _format_property_contracts(prop=obj)
 
@@ -505,7 +652,7 @@ def _format_contracts(what: str, obj: Any) -> List[str]:
         return _format_invariants(invariants=invariants)
 
     # Only properties, functions and classes have contracts.
-    return []
+    return Lines([])
 
 
 def process_docstring(app, what, name, obj, options, lines):
