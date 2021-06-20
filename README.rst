@@ -150,7 +150,7 @@ Namely, we use:
 * Static type analysis is performed with `mypy <http://mypy-lang.org/>`_.
 * Various linter checks are done with `pylint <https://www.pylint.org/>`_.
 * Contracts are linted with `pyicontract-lint <https://github.com/Parquery/pyicontract-lint>`_.
-* Doctests are executed using the Python `doctest module <https://docs.python.org/3.5/library/doctest.html>`_.
+* Doctests are executed using the Python `doctest module <https://docs.python.org/3.8/library/doctest.html>`_.
 
 Run the pre-commit checks locally from an activated virtual environment with development dependencies:
 
