@@ -1,9 +1,9 @@
 sphinx-icontract
 ================
 
-.. image:: https://api.travis-ci.com/Parquery/sphinx-icontract.svg?branch=master
-    :target: https://api.travis-ci.com/Parquery/sphinx-icontract.svg?branch=master
-    :alt: Build Status
+.. image:: https://github.com/Parquery/sphinx-icontract/workflows/CI/badge.svg
+    :target: https://github.com/Parquery/sphinx-icontract/actions?query=workflow%3ACI
+    :alt: Continuous integration
 
 .. image:: https://coveralls.io/repos/github/Parquery/sphinx-icontract/badge.svg?branch=master
     :target: https://coveralls.io/github/Parquery/sphinx-icontract?branch=master
