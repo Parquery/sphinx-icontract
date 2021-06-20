@@ -263,6 +263,7 @@ class TestFormatContracts(unittest.TestCase):
                 # yapf: disable
                 ':ensures:',
                 '    * :code:`all(pth in result for pth in initial_paths if pth.is_file())`',
+                '',
                 '      (Initial files also in result)'
                 # yapf: enable
             ],
@@ -395,9 +396,11 @@ class TestFormatContracts(unittest.TestCase):
                 # yapf: disable
                 ':requires:',
                 '    * :code:`x > 0`',
+                '',
                 '      (some precondition)',
                 ':ensures:',
                 '    * :code:`result >= x`',
+                '',
                 '      (some postcondition)'
                 # yapf: enable
             ],
@@ -474,6 +477,7 @@ class TestFormatContracts(unittest.TestCase):
                 # yapf: disable
                 ':establishes:',
                 '    * :code:`self.some_getter() > 0`',
+                '',
                 '      (some invariant)'
                 # yapf: enable
             ],
@@ -637,6 +641,7 @@ class TestError(unittest.TestCase):
             [
                 ':requires:',
                 '    * :code:`x > 0`',
+                '',
                 '      (x positive; raise :py:class:`ValueError`)'
             ],
             lines)
@@ -656,6 +661,7 @@ class TestError(unittest.TestCase):
             [
                 ':requires:',
                 '    * :code:`x > 0`',
+                '',
                 '      (Raise :py:class:`ValueError`)'
             ],
             lines)
@@ -673,6 +679,7 @@ class TestError(unittest.TestCase):
             [
                 ':requires:',
                 '    * :code:`x > 0`',
+                '',
                 '      (x positive; raise :py:class:`ValueError`)'
             ],
             lines)
@@ -693,6 +700,7 @@ class TestError(unittest.TestCase):
             [
                 ':requires:',
                 '    * :py:func:`must_be_positive`',
+                '',
                 '      (x positive; raise :py:class:`ValueError`)'
             ],
             lines)
@@ -714,6 +722,7 @@ class TestError(unittest.TestCase):
             [
                 ':requires:',
                 '    * :code:`x > 0`',
+                '',
                 '      (x positive; raise :py:class:`SomeClass.SomeError`)'
             ],
             lines)
@@ -732,6 +741,7 @@ class TestError(unittest.TestCase):
             [
                 ':requires:',
                 '    * :code:`x > 0`',
+                '',
                 '      (x must be positive; raise :py:class:`ValueError`)'
             ],
             lines)
@@ -749,6 +759,7 @@ class TestError(unittest.TestCase):
             [
                 ':requires:',
                 '    * :code:`x > 0`',
+                '',
                 '      (Raise :py:class:`ValueError`)'
             ],
             lines)
@@ -769,6 +780,7 @@ class TestError(unittest.TestCase):
             [
                 ':requires:',
                 '    * :py:func:`must_be_positive`',
+                '',
                 '      (Raise :py:class:`ValueError`)'
             ],
             lines)
@@ -787,6 +799,7 @@ class TestError(unittest.TestCase):
             [
                 ':requires:',
                 '    * :code:`x > 0`',
+                '',
                 '      (x must be positive; raise :py:class:`ValueError`)'
             ],
             lines)

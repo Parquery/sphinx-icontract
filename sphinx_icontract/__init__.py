@@ -361,7 +361,7 @@ def _format_contract(contract: icontract._Contract) -> Lines:
         doc = None
 
     if doc is not None:
-        result = condition_lines + Lines(["({})".format(doc)])
+        result = condition_lines + Lines(["", "({})".format(doc)])
     else:
         result = condition_lines
 
