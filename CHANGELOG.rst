@@ -1,3 +1,10 @@
+2.0.3
+=====
+* Added newline before contract description (#31)
+* Fixed support for multi-line lambda inspections (#27)
+* Dropped support for Python 3.5 (#30)
+* Fixed mypy issue with ``callable`` (#29)
+
 2.0.2
 =====
 *  Fixed compatibility with `icontract` >=2.4.0 (#24)
